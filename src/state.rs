@@ -161,6 +161,21 @@ impl HexEditorState {
         self.pending_nibble = None;
     }
 
+    pub fn move_page_up(&mut self, rows: usize) {
+        self.cursor_offset = self
+            .cursor_offset
+            .saturating_sub(self.bytes_per_row * rows.max(1));
+        self.pending_nibble = None;
+    }
+
+    pub fn move_page_down(&mut self, rows: usize) {
+        if !self.is_empty() {
+            self.cursor_offset =
+                (self.cursor_offset + self.bytes_per_row * rows.max(1)).min(self.max_offset());
+        }
+        self.pending_nibble = None;
+    }
+
     pub fn begin_selection(&mut self, anchor: usize) {
         let clamped = anchor.min(self.max_offset());
         self.selection_anchor = Some(clamped);
@@ -244,6 +259,51 @@ impl HexEditorState {
         self.pending_nibble = None;
         self.dirty = true;
         Ok(())
+    }
+
+    pub fn delete(&mut self) -> Result<(), EditError> {
+        self.overwrite_byte(0x00)
+    }
+
+    pub fn backspace(&mut self) -> Result<(), EditError> {
+        if self.read_only {
+            return Err(EditError::ReadOnly);
+        }
+        if self.is_empty() {
+            return Err(EditError::OutOfBounds);
+        }
+
+        self.move_left();
+        self.overwrite_byte(0x00)
+    }
+
+    pub fn handle_text_input(&mut self, text: &str) -> bool {
+        let Some(character) = text.chars().next() else {
+            return false;
+        };
+
+        match self.active_pane {
+            ActivePane::Hex => self.apply_hex_digit(character).is_ok(),
+            ActivePane::Ascii => self.apply_ascii_char(character).is_ok(),
+        }
+    }
+
+    pub fn handle_key(&mut self, key: &str, page_rows: usize) -> bool {
+        match key {
+            "left" => self.move_left(),
+            "right" => self.move_right(),
+            "up" => self.move_up(),
+            "down" => self.move_down(),
+            "home" => self.move_home(),
+            "end" => self.move_end(),
+            "pageup" => self.move_page_up(page_rows),
+            "pagedown" => self.move_page_down(page_rows),
+            "backspace" => return self.backspace().is_ok(),
+            "delete" => return self.delete().is_ok(),
+            _ => return false,
+        }
+
+        true
     }
 
     pub fn apply_hex_digit(&mut self, digit: char) -> Result<(), EditError> {
@@ -455,5 +515,55 @@ mod tests {
         let mut state = HexEditorState::new(vec![0; 4], 16);
         state.set_active_pane(ActivePane::Ascii);
         assert_eq!(state.active_pane(), ActivePane::Ascii);
+    }
+
+    #[test]
+    fn backspace_clears_previous_byte_and_moves_cursor() {
+        let mut state = HexEditorState::new(vec![0xAA, 0xBB, 0xCC], 16);
+        state.set_cursor(2);
+
+        state.backspace().unwrap();
+
+        assert_eq!(state.cursor_offset(), 1);
+        assert_eq!(state.bytes()[1], 0x00);
+    }
+
+    #[test]
+    fn delete_clears_current_byte() {
+        let mut state = HexEditorState::new(vec![0xAA, 0xBB], 16);
+        state.set_cursor(1);
+
+        state.delete().unwrap();
+
+        assert_eq!(state.bytes()[1], 0x00);
+        assert_eq!(state.cursor_offset(), 1);
+    }
+
+    #[test]
+    fn handle_text_input_uses_active_pane() {
+        let mut state = HexEditorState::new(vec![0x00, 0x00], 16);
+        state.set_active_pane(ActivePane::Ascii);
+
+        assert!(state.handle_text_input("A"));
+        assert_eq!(state.bytes()[0], b'A');
+
+        state.set_active_pane(ActivePane::Hex);
+        state.set_cursor(1);
+        assert!(state.handle_text_input("C"));
+        assert!(state.handle_text_input("D"));
+        assert_eq!(state.bytes()[1], 0xCD);
+    }
+
+    #[test]
+    fn handle_navigation_keys_moves_cursor() {
+        let mut state = HexEditorState::new(vec![0; 64], 16);
+        state.set_cursor(17);
+
+        assert!(state.handle_key("down", 16));
+        assert_eq!(state.cursor_offset(), 33);
+        assert!(state.handle_key("pageup", 2));
+        assert_eq!(state.cursor_offset(), 1);
+        assert!(state.handle_key("end", 16));
+        assert_eq!(state.cursor_offset(), 15);
     }
 }

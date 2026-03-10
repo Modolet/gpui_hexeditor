@@ -14,15 +14,29 @@
 ## 使用方式
 
 ```rust
+use gpui::{Context, Window};
 use gpui_hexeditor::{HexEditor, HexEditorConfig};
 
-let editor = HexEditor::new(
-    vec![0x48, 0x65, 0x78, 0x21],
-    HexEditorConfig::default().with_bytes_per_row(16),
-);
+fn build_editor(window: &mut Window, cx: &mut Context<MyView>) {
+    let _editor = cx.new(|cx| {
+        HexEditor::new(
+            vec![0x48, 0x65, 0x78, 0x21],
+            HexEditorConfig::default().with_bytes_per_row(16),
+            cx,
+        )
+    });
+}
 ```
 
 ## 示例
 
 - 纯展示：`cargo run --example basic`
 - 打开并保存本地文件：`cargo run --example file_editor -- ./sample.bin`
+
+## 当前交互
+
+- 点击 Hex/ASCII 单元格后获得焦点
+- 方向键、`Home`、`End`、`PageUp`、`PageDown` 移动光标
+- Hex 区直接输入 `0-9A-F`，按半字节连续写入
+- ASCII 区直接输入可见字符覆盖字节
+- `Backspace` / `Delete` 直接清零当前字节

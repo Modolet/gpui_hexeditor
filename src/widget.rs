@@ -1,32 +1,37 @@
 use gpui::{
-    App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div,
-    prelude::FluentBuilder,
+    App, Context, Entity, FocusHandle, Focusable, InteractiveElement, IntoElement, KeyDownEvent,
+    MouseButton, ParentElement, Render, SharedString, Styled, Window, div, prelude::FluentBuilder,
 };
 use gpui_component::{ActiveTheme, label::Label};
 
 use crate::{HexEditorConfig, HexEditorState, HexEditorStyle, state::ActivePane};
 
-#[derive(Debug, Clone, IntoElement)]
 pub struct HexEditor {
-    pub state: HexEditorState,
-    pub config: HexEditorConfig,
-    pub style: Option<HexEditorStyle>,
+    state: HexEditorState,
+    config: HexEditorConfig,
+    style: Option<HexEditorStyle>,
     title: SharedString,
+    focus_handle: FocusHandle,
 }
 
 impl HexEditor {
-    pub fn new(buffer: Vec<u8>, config: HexEditorConfig) -> Self {
+    pub fn new(buffer: Vec<u8>, config: HexEditorConfig, cx: &mut Context<Self>) -> Self {
         let mut state = HexEditorState::new(buffer, config.bytes_per_row);
         state.set_read_only(config.read_only);
-        Self::from_state(state, config)
+        Self::from_state(state, config, cx)
     }
 
-    pub fn from_state(state: HexEditorState, config: HexEditorConfig) -> Self {
+    pub fn from_state(
+        state: HexEditorState,
+        config: HexEditorConfig,
+        cx: &mut Context<Self>,
+    ) -> Self {
         Self {
             state,
             config,
             style: None,
             title: "Hex Editor".into(),
+            focus_handle: cx.focus_handle(),
         }
     }
 
@@ -40,8 +45,75 @@ impl HexEditor {
         self
     }
 
+    pub fn bytes_cloned(&self) -> Vec<u8> {
+        self.state.bytes_cloned()
+    }
+
+    pub fn len(&self) -> usize {
+        self.state.len()
+    }
+
+    pub fn cursor_offset(&self) -> usize {
+        self.state.cursor_offset()
+    }
+
+    pub fn overwrite_byte(&mut self, value: u8) {
+        let _ = self.state.overwrite_byte(value);
+    }
+
+    pub fn apply_ascii_char(&mut self, character: char) {
+        let _ = self.state.apply_ascii_char(character);
+    }
+
+    pub fn move_left(&mut self) {
+        self.state.move_left();
+    }
+
+    pub fn move_right(&mut self) {
+        self.state.move_right();
+    }
+
     fn resolved_style(&self, cx: &App) -> HexEditorStyle {
         self.style.unwrap_or_else(|| HexEditorStyle::resolve(cx))
+    }
+
+    fn focus_cell(
+        &mut self,
+        offset: usize,
+        pane: ActivePane,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.state.set_active_pane(pane);
+        self.state.set_cursor(offset);
+        window.focus(&self.focus_handle);
+        cx.notify();
+    }
+
+    fn on_key_down(&mut self, event: &KeyDownEvent, _window: &mut Window, cx: &mut Context<Self>) {
+        let modifiers = event.keystroke.modifiers;
+        let handled_navigation = self
+            .state
+            .handle_key(event.keystroke.key.as_str(), self.config.visible_rows);
+        if handled_navigation {
+            cx.notify();
+            return;
+        }
+
+        if modifiers.control || modifiers.alt || modifiers.platform || modifiers.function {
+            return;
+        }
+
+        if let Some(text) = event.keystroke.key_char.as_deref() {
+            if self.state.handle_text_input(text) {
+                cx.notify();
+                return;
+            }
+        }
+
+        if self.state.handle_text_input(event.keystroke.key.as_str()) {
+            cx.notify();
+        }
     }
 
     fn render_toolbar(&self, style: HexEditorStyle) -> impl IntoElement {
@@ -136,10 +208,138 @@ impl HexEditor {
             })
     }
 
-    fn render_row(&self, row: usize, style: HexEditorStyle) -> impl IntoElement {
+    fn render_hex_cell(
+        &self,
+        offset: usize,
+        value: String,
+        style: HexEditorStyle,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        let is_cursor = offset == self.state.cursor_offset();
+        let is_selected = self.state.is_selected(offset);
+        let cell = div()
+            .id(("hex", offset))
+            .w_10()
+            .px_0p5()
+            .py_0p5()
+            .text_center()
+            .font_family("DejaVu Sans Mono")
+            .text_xs()
+            .rounded(style.cell_radius)
+            .text_color(style.text)
+            .cursor_pointer()
+            .when(is_selected, |this| this.bg(style.selection_background))
+            .when(is_cursor, |this| {
+                this.bg(style.current_cell_background)
+                    .border_1()
+                    .border_color(style.focus_ring)
+            })
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(move |this, _, window, cx| {
+                    this.focus_cell(offset, ActivePane::Hex, window, cx);
+                }),
+            );
+
+        let cell = if is_selected {
+            cell.bg(style.selection_background)
+        } else {
+            cell
+        };
+
+        let cell = if is_cursor {
+            cell.bg(style.current_cell_background)
+                .border_1()
+                .border_color(style.focus_ring)
+        } else {
+            cell
+        };
+
+        cell.child(value)
+    }
+
+    fn render_ascii_cell(
+        &self,
+        offset: usize,
+        ascii: char,
+        style: HexEditorStyle,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        let is_cursor = offset == self.state.cursor_offset();
+        let is_selected = self.state.is_selected(offset);
+        let cell = div()
+            .id(("ascii", offset))
+            .w_3()
+            .text_center()
+            .font_family("DejaVu Sans Mono")
+            .text_xs()
+            .rounded(style.cell_radius)
+            .cursor_pointer()
+            .when(is_selected, |this| this.bg(style.selection_background))
+            .when(is_cursor, |this| {
+                this.bg(style.current_cell_background)
+                    .border_1()
+                    .border_color(style.focus_ring)
+            })
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(move |this, _, window, cx| {
+                    this.focus_cell(offset, ActivePane::Ascii, window, cx);
+                }),
+            );
+
+        let cell = if is_selected {
+            cell.bg(style.selection_background)
+        } else {
+            cell
+        };
+
+        let cell = if is_cursor {
+            cell.bg(style.current_cell_background)
+                .border_1()
+                .border_color(style.focus_ring)
+        } else {
+            cell
+        };
+
+        cell.child(ascii.to_string())
+    }
+
+    fn render_row(
+        &self,
+        row: usize,
+        style: HexEditorStyle,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
         let bytes = self.state.row_bytes(row);
         let row_start = row * self.state.bytes_per_row();
         let is_current_row = self.state.offset_to_row_col(self.state.cursor_offset()).0 == row;
+        let mut hex_cells = Vec::with_capacity(self.state.bytes_per_row());
+        for column in 0..self.state.bytes_per_row() {
+            let offset = row_start + column;
+            let value = bytes
+                .get(column)
+                .map(|byte| format!("{byte:02X}"))
+                .unwrap_or_else(|| "  ".to_string());
+            hex_cells.push(
+                self.render_hex_cell(offset, value, style, cx)
+                    .into_any_element(),
+            );
+        }
+
+        let mut ascii_cells = Vec::with_capacity(bytes.len());
+        for (column, byte) in bytes.iter().enumerate() {
+            let offset = row_start + column;
+            let ascii = if byte.is_ascii_graphic() || *byte == b' ' {
+                char::from(*byte)
+            } else {
+                '·'
+            };
+            ascii_cells.push(
+                self.render_ascii_cell(offset, ascii, style, cx)
+                    .into_any_element(),
+            );
+        }
 
         div()
             .flex()
@@ -158,67 +358,9 @@ impl HexEditor {
                     .text_color(style.muted_text)
                     .child(format!("{row_start:08X}")),
             )
-            .child(
-                div()
-                    .flex_1()
-                    .flex()
-                    .gap_0p5()
-                    .children((0..self.state.bytes_per_row()).map(|column| {
-                        let offset = row_start + column;
-                        let value = bytes
-                            .get(column)
-                            .map(|byte| format!("{byte:02X}"))
-                            .unwrap_or_else(|| "  ".to_string());
-                        let is_cursor = offset == self.state.cursor_offset();
-                        let is_selected = self.state.is_selected(offset);
-                        div()
-                            .w_10()
-                            .px_0p5()
-                            .py_0p5()
-                            .text_center()
-                            .font_family("DejaVu Sans Mono")
-                            .text_xs()
-                            .rounded(style.cell_radius)
-                            .text_color(style.text)
-                            .when(is_selected, |this| this.bg(style.selection_background))
-                            .when(is_cursor, |this| {
-                                this.bg(style.current_cell_background)
-                                    .border_1()
-                                    .border_color(style.focus_ring)
-                            })
-                            .child(value)
-                    })),
-            )
+            .child(div().flex().flex_1().gap_0p5().children(hex_cells))
             .when(self.config.show_ascii, |this| {
-                this.child(
-                    div()
-                        .w_40()
-                        .flex()
-                        .gap_0p5()
-                        .children(bytes.iter().enumerate().map(|(column, byte)| {
-                            let offset = row_start + column;
-                            let is_cursor = offset == self.state.cursor_offset();
-                            let is_selected = self.state.is_selected(offset);
-                            let ascii = if byte.is_ascii_graphic() || *byte == b' ' {
-                                char::from(*byte)
-                            } else {
-                                '·'
-                            };
-                            div()
-                                .w_3()
-                                .text_center()
-                                .font_family("DejaVu Sans Mono")
-                                .text_xs()
-                                .rounded(style.cell_radius)
-                                .when(is_selected, |this| this.bg(style.selection_background))
-                                .when(is_cursor, |this| {
-                                    this.bg(style.current_cell_background)
-                                        .border_1()
-                                        .border_color(style.focus_ring)
-                                })
-                                .child(ascii.to_string())
-                        })),
-                )
+                this.child(div().w_40().flex().gap_0p5().children(ascii_cells))
             })
     }
 
@@ -237,13 +379,13 @@ impl HexEditor {
             .bg(style.panel_background)
             .text_xs()
             .child(format!(
-                "Offset 0x{:08X}  ·  行 {} 列 {}",
+                "Offset 0x{:08X} · 行 {} 列 {}",
                 self.state.cursor_offset(),
                 row + 1,
                 col + 1
             ))
             .child(format!(
-                "选中 {} B  ·  {}",
+                "选中 {} B · {}",
                 self.state.selection_len(),
                 if self.state.is_dirty() {
                     "已修改"
@@ -254,37 +396,59 @@ impl HexEditor {
     }
 }
 
-impl RenderOnce for HexEditor {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+impl Focusable for HexEditor {
+    fn focus_handle(&self, _cx: &App) -> FocusHandle {
+        self.focus_handle.clone()
+    }
+}
+
+impl Render for HexEditor {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let style = self.resolved_style(cx);
         let visible_rows = self.config.visible_rows.min(self.state.row_count().max(1));
         let current_row = self.state.offset_to_row_col(self.state.cursor_offset()).0;
         let start_row = current_row.saturating_sub(visible_rows / 2);
         let end_row = (start_row + visible_rows).min(self.state.row_count());
+        let is_focused = self.focus_handle.is_focused(window);
+        let mut rows = Vec::with_capacity(end_row.saturating_sub(start_row));
+        for row in start_row..end_row {
+            rows.push(self.render_row(row, style, cx).into_any_element());
+        }
 
-        div()
+        let root = div()
+            .id("hex-editor")
+            .track_focus(&self.focus_handle)
+            .on_key_down(cx.listener(Self::on_key_down))
             .flex()
             .flex_col()
             .bg(style.background)
             .border_1()
-            .border_color(style.border)
             .rounded(style.radius)
-            .overflow_hidden()
-            .when(self.config.show_toolbar, |this| {
-                this.child(self.render_toolbar(style))
-            })
-            .child(self.render_header(style))
-            .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .gap_0p5()
-                    .p_1()
-                    .bg(cx.theme().background)
-                    .children((start_row..end_row).map(|row| self.render_row(row, style))),
-            )
-            .when(self.config.show_status_bar, |this| {
-                this.child(self.render_status_bar(style))
-            })
+            .overflow_hidden();
+
+        let mut root = root.border_color(if is_focused {
+            style.focus_ring
+        } else {
+            style.border
+        });
+        if self.config.show_toolbar {
+            root = root.child(self.render_toolbar(style));
+        }
+        root = root.child(self.render_header(style));
+        root = root.child(
+            div()
+                .flex()
+                .flex_col()
+                .gap_0p5()
+                .p_1()
+                .bg(cx.theme().background)
+                .children(rows),
+        );
+        if self.config.show_status_bar {
+            root = root.child(self.render_status_bar(style));
+        }
+        root
     }
 }
+
+pub type HexEditorEntity = Entity<HexEditor>;

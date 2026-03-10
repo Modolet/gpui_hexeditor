@@ -9,25 +9,38 @@ use gpui_component::{
     button::{Button, ButtonVariants},
     label::Label,
 };
-use gpui_hexeditor::{HexEditor, HexEditorConfig, HexEditorState};
+use gpui_hexeditor::{HexEditor, HexEditorConfig, HexEditorEntity};
 
 struct FileEditorDemo {
     path: PathBuf,
-    state: HexEditorState,
+    editor: HexEditorEntity,
     message: SharedString,
 }
 
 impl FileEditorDemo {
-    fn new(path: PathBuf, bytes: Vec<u8>) -> Self {
+    fn new(path: PathBuf, bytes: Vec<u8>, _window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let title = path.display().to_string();
+        let editor = cx.new(|cx| {
+            HexEditor::new(
+                bytes,
+                HexEditorConfig::default()
+                    .with_bytes_per_row(16)
+                    .with_visible_rows(24),
+                cx,
+            )
+            .with_title(title)
+        });
+
         Self {
             path,
-            state: HexEditorState::new(bytes, 16),
-            message: "已加载文件".into(),
+            editor,
+            message: "已加载文件，点击单元格后直接键盘编辑".into(),
         }
     }
 
-    fn save(&mut self) -> std::io::Result<()> {
-        fs::write(&self.path, self.state.bytes_cloned())?;
+    fn save(&mut self, cx: &mut Context<Self>) -> std::io::Result<()> {
+        let bytes = self.editor.read_with(cx, |editor, _| editor.bytes_cloned());
+        fs::write(&self.path, bytes)?;
         self.message = format!("已保存到 {}", self.path.display()).into();
         Ok(())
     }
@@ -35,13 +48,9 @@ impl FileEditorDemo {
 
 impl Render for FileEditorDemo {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let editor = HexEditor::from_state(
-            self.state.clone(),
-            HexEditorConfig::default()
-                .with_bytes_per_row(16)
-                .with_visible_rows(24),
-        )
-        .with_title(self.path.display().to_string());
+        let (len, offset) = self
+            .editor
+            .read_with(cx, |editor, _| (editor.len(), editor.cursor_offset()));
 
         div()
             .size_full()
@@ -63,12 +72,8 @@ impl Render for FileEditorDemo {
                             .gap_1()
                             .child(Label::new(self.path.display().to_string()))
                             .child(
-                                Label::new(format!(
-                                    "{} bytes · offset 0x{:08X}",
-                                    self.state.len(),
-                                    self.state.cursor_offset()
-                                ))
-                                .text_sm(),
+                                Label::new(format!("{} bytes · offset 0x{:08X}", len, offset))
+                                    .text_sm(),
                             ),
                     )
                     .child(
@@ -81,8 +86,10 @@ impl Render for FileEditorDemo {
                                     .compact()
                                     .label("←")
                                     .on_click(cx.listener(|this, _, _, cx| {
-                                        this.state.move_left();
-                                        cx.notify();
+                                        this.editor.update(cx, |editor, cx| {
+                                            editor.move_left();
+                                            cx.notify();
+                                        });
                                     })),
                             )
                             .child(
@@ -90,8 +97,10 @@ impl Render for FileEditorDemo {
                                     .compact()
                                     .label("→")
                                     .on_click(cx.listener(|this, _, _, cx| {
-                                        this.state.move_right();
-                                        cx.notify();
+                                        this.editor.update(cx, |editor, cx| {
+                                            editor.move_right();
+                                            cx.notify();
+                                        });
                                     })),
                             )
                             .child(
@@ -99,8 +108,10 @@ impl Render for FileEditorDemo {
                                     .compact()
                                     .label("00")
                                     .on_click(cx.listener(|this, _, _, cx| {
-                                        let _ = this.state.overwrite_byte(0x00);
-                                        cx.notify();
+                                        this.editor.update(cx, |editor, cx| {
+                                            editor.overwrite_byte(0x00);
+                                            cx.notify();
+                                        });
                                     })),
                             )
                             .child(
@@ -108,14 +119,18 @@ impl Render for FileEditorDemo {
                                     .compact()
                                     .label("FF")
                                     .on_click(cx.listener(|this, _, _, cx| {
-                                        let _ = this.state.overwrite_byte(0xFF);
-                                        cx.notify();
+                                        this.editor.update(cx, |editor, cx| {
+                                            editor.overwrite_byte(0xFF);
+                                            cx.notify();
+                                        });
                                     })),
                             )
                             .child(Button::new("ascii-a").compact().label("写入 A").on_click(
                                 cx.listener(|this, _, _, cx| {
-                                    let _ = this.state.apply_ascii_char('A');
-                                    cx.notify();
+                                    this.editor.update(cx, |editor, cx| {
+                                        editor.apply_ascii_char('A');
+                                        cx.notify();
+                                    });
                                 }),
                             ))
                             .child(
@@ -124,16 +139,15 @@ impl Render for FileEditorDemo {
                                     .primary()
                                     .label("保存")
                                     .on_click(cx.listener(|this, _, _, cx| {
-                                        this.message = match this.save() {
-                                            Ok(()) => this.message.clone(),
-                                            Err(error) => format!("保存失败: {error}").into(),
-                                        };
+                                        if let Err(error) = this.save(cx) {
+                                            this.message = format!("保存失败: {error}").into();
+                                        }
                                         cx.notify();
                                     })),
                             ),
                     ),
             )
-            .child(editor)
+            .child(self.editor.clone())
             .child(
                 div()
                     .px_1()
@@ -162,10 +176,10 @@ fn main() {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
                 ..Default::default()
             },
-            move |_, cx| {
+            move |window, cx| {
                 let path = path.clone();
                 let bytes = bytes.clone();
-                cx.new(|_| FileEditorDemo::new(path, bytes))
+                cx.new(|cx| FileEditorDemo::new(path, bytes, window, cx))
             },
         )
         .unwrap();
