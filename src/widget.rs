@@ -1,6 +1,7 @@
 use gpui::{
-    App, Context, Entity, FocusHandle, Focusable, InteractiveElement, IntoElement, KeyDownEvent,
-    MouseButton, ParentElement, Render, SharedString, Styled, Window, div, prelude::FluentBuilder,
+    App, ClipboardItem, Context, Entity, FocusHandle, Focusable, InteractiveElement, IntoElement,
+    KeyDownEvent, MouseButton, MouseMoveEvent, MouseUpEvent, ParentElement, Render, SharedString,
+    Styled, Window, div, prelude::FluentBuilder,
 };
 use gpui_component::{ActiveTheme, label::Label};
 
@@ -12,6 +13,7 @@ pub struct HexEditor {
     style: Option<HexEditorStyle>,
     title: SharedString,
     focus_handle: FocusHandle,
+    dragging_selection: bool,
 }
 
 impl HexEditor {
@@ -32,6 +34,7 @@ impl HexEditor {
             style: None,
             title: "Hex Editor".into(),
             focus_handle: cx.focus_handle(),
+            dragging_selection: false,
         }
     }
 
@@ -77,21 +80,67 @@ impl HexEditor {
         self.style.unwrap_or_else(|| HexEditorStyle::resolve(cx))
     }
 
-    fn focus_cell(
+    fn begin_pointer_selection(
         &mut self,
         offset: usize,
         pane: ActivePane,
+        extend: bool,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
         self.state.set_active_pane(pane);
-        self.state.set_cursor(offset);
+        if extend {
+            let anchor = self
+                .state
+                .selection_anchor()
+                .unwrap_or(self.state.cursor_offset());
+            self.state.begin_selection(anchor);
+            self.state.update_selection(offset);
+        } else {
+            self.state.begin_selection(offset);
+        }
+        self.dragging_selection = true;
         window.focus(&self.focus_handle);
         cx.notify();
     }
 
+    fn update_pointer_selection(&mut self, offset: usize, cx: &mut Context<Self>) {
+        if self.dragging_selection {
+            self.state.update_selection(offset);
+            cx.notify();
+        }
+    }
+
+    fn extend_selection_with_key(&mut self, key: &str) -> bool {
+        let anchor = self
+            .state
+            .selection_anchor()
+            .unwrap_or(self.state.cursor_offset());
+        self.state.begin_selection(anchor);
+        let handled = self.state.handle_key(key, self.config.visible_rows);
+        if handled {
+            let focus = self.state.cursor_offset();
+            self.state.update_selection(focus);
+        }
+        handled
+    }
+
     fn on_key_down(&mut self, event: &KeyDownEvent, _window: &mut Window, cx: &mut Context<Self>) {
         let modifiers = event.keystroke.modifiers;
+        if (modifiers.control || modifiers.platform)
+            && event.keystroke.key.eq_ignore_ascii_case("c")
+        {
+            if let Some(text) = self.state.selected_hex_string() {
+                cx.write_to_clipboard(ClipboardItem::new_string(text));
+            }
+            return;
+        }
+
+        if modifiers.shift && self.extend_selection_with_key(event.keystroke.key.as_str()) {
+            cx.notify();
+            return;
+        }
+
         let handled_navigation = self
             .state
             .handle_key(event.keystroke.key.as_str(), self.config.visible_rows);
@@ -114,6 +163,15 @@ impl HexEditor {
         if self.state.handle_text_input(event.keystroke.key.as_str()) {
             cx.notify();
         }
+    }
+
+    fn on_mouse_up(
+        &mut self,
+        _event: &MouseUpEvent,
+        _window: &mut Window,
+        _cx: &mut Context<Self>,
+    ) {
+        self.dragging_selection = false;
     }
 
     fn render_toolbar(&self, style: HexEditorStyle) -> impl IntoElement {
@@ -236,10 +294,21 @@ impl HexEditor {
             })
             .on_mouse_down(
                 MouseButton::Left,
-                cx.listener(move |this, _, window, cx| {
-                    this.focus_cell(offset, ActivePane::Hex, window, cx);
+                cx.listener(move |this, event: &gpui::MouseDownEvent, window, cx| {
+                    this.begin_pointer_selection(
+                        offset,
+                        ActivePane::Hex,
+                        event.modifiers.shift,
+                        window,
+                        cx,
+                    );
                 }),
             );
+        let cell = cell.on_mouse_move(cx.listener(move |this, event: &MouseMoveEvent, _, cx| {
+            if event.dragging() {
+                this.update_pointer_selection(offset, cx);
+            }
+        }));
 
         let cell = if is_selected {
             cell.bg(style.selection_background)
@@ -283,10 +352,21 @@ impl HexEditor {
             })
             .on_mouse_down(
                 MouseButton::Left,
-                cx.listener(move |this, _, window, cx| {
-                    this.focus_cell(offset, ActivePane::Ascii, window, cx);
+                cx.listener(move |this, event: &gpui::MouseDownEvent, window, cx| {
+                    this.begin_pointer_selection(
+                        offset,
+                        ActivePane::Ascii,
+                        event.modifiers.shift,
+                        window,
+                        cx,
+                    );
                 }),
             );
+        let cell = cell.on_mouse_move(cx.listener(move |this, event: &MouseMoveEvent, _, cx| {
+            if event.dragging() {
+                this.update_pointer_selection(offset, cx);
+            }
+        }));
 
         let cell = if is_selected {
             cell.bg(style.selection_background)
@@ -419,6 +499,7 @@ impl Render for HexEditor {
             .id("hex-editor")
             .track_focus(&self.focus_handle)
             .on_key_down(cx.listener(Self::on_key_down))
+            .on_mouse_up(MouseButton::Left, cx.listener(Self::on_mouse_up))
             .flex()
             .flex_col()
             .bg(style.background)

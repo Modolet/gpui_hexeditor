@@ -199,6 +199,10 @@ impl HexEditorState {
         self.selection_anchor = None;
     }
 
+    pub fn selection_anchor(&self) -> Option<usize> {
+        self.selection_anchor
+    }
+
     pub fn selected_range(&self) -> Option<&SelectionRange> {
         self.selection.as_ref()
     }
@@ -215,6 +219,17 @@ impl HexEditorState {
             .as_ref()
             .map(|range| range.contains(&offset))
             .unwrap_or(false)
+    }
+
+    pub fn selected_hex_string(&self) -> Option<String> {
+        let range = self.selection.as_ref()?;
+        Some(
+            self.bytes[*range.start()..=*range.end()]
+                .iter()
+                .map(|byte| format!("{byte:02X}"))
+                .collect::<Vec<_>>()
+                .join(" "),
+        )
     }
 
     pub fn set_read_only(&mut self, read_only: bool) {
@@ -565,5 +580,24 @@ mod tests {
         assert_eq!(state.cursor_offset(), 1);
         assert!(state.handle_key("end", 16));
         assert_eq!(state.cursor_offset(), 15);
+    }
+
+    #[test]
+    fn selected_hex_string_formats_range() {
+        let mut state = HexEditorState::new(vec![0xDE, 0xAD, 0xBE, 0xEF], 16);
+        state.begin_selection(1);
+        state.update_selection(3);
+
+        assert_eq!(state.selected_hex_string().as_deref(), Some("AD BE EF"));
+    }
+
+    #[test]
+    fn selection_anchor_tracks_drag_start() {
+        let mut state = HexEditorState::new(vec![0; 16], 16);
+        state.begin_selection(5);
+        state.update_selection(9);
+
+        assert_eq!(state.selection_anchor(), Some(5));
+        assert_eq!(state.selected_range(), Some(&(5..=9)));
     }
 }

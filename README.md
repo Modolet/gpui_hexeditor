@@ -36,6 +36,9 @@ fn build_editor(window: &mut Window, cx: &mut Context<MyView>) {
 ## 当前交互
 
 - 点击 Hex/ASCII 单元格后获得焦点
+- 鼠标拖拽可连续建立选区
+- `Shift + 方向键/Home/End/PageUp/PageDown` 可扩展选区
+- `Ctrl/Cmd + C` 复制选中字节的十六进制文本
 - 方向键、`Home`、`End`、`PageUp`、`PageDown` 移动光标
 - Hex 区直接输入 `0-9A-F`，按半字节连续写入
 - ASCII 区直接输入可见字符覆盖字节
