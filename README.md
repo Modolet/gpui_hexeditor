@@ -42,9 +42,11 @@ fn build_editor(window: &mut Window, cx: &mut Context<MyView>) {
 - `Ctrl/Cmd + C` 复制选中字节的十六进制文本
 - `Ctrl/Cmd + X` 剪切选区为十六进制文本并清零原字节
 - `Ctrl/Cmd + A` 全选全部字节
+- `Ctrl/Cmd + Z` / `Ctrl/Cmd + Shift + Z` 撤销与重做
 - 双击 Hex/ASCII 单元格可选中整行
 - 内容区支持组件内部纵向滚动
 - 方向键、`Home`、`End`、`PageUp`、`PageDown` 移动光标
 - Hex 区直接输入 `0-9A-F`，按半字节连续写入
 - ASCII 区直接输入可见字符覆盖字节
 - `Backspace` / `Delete` 直接清零当前字节
+- 未保存的脏字节会以 danger 语义色高亮，保存后清空

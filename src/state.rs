@@ -1,7 +1,9 @@
-use std::ops::RangeInclusive;
+use std::{collections::BTreeSet, ops::RangeInclusive};
 
+/// 十六进制编辑器的选区范围类型。
 pub type SelectionRange = RangeInclusive<usize>;
 
+/// 编辑状态相关的错误类型。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EditError {
     ReadOnly,
@@ -11,6 +13,7 @@ pub enum EditError {
     InvalidHexPayload,
 }
 
+/// 当前激活的编辑区域。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ActivePane {
     #[default]
@@ -19,8 +22,22 @@ pub enum ActivePane {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+struct StateSnapshot {
+    bytes: Vec<u8>,
+    cursor_offset: usize,
+    selection: Option<SelectionRange>,
+    selection_anchor: Option<usize>,
+    active_pane: ActivePane,
+    pending_nibble: Option<u8>,
+    dirty_offsets: BTreeSet<usize>,
+    dirty: bool,
+}
+
+/// `HexEditor` 的核心状态模型，负责维护缓冲区、光标、选区与编辑历史。
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HexEditorState {
     bytes: Vec<u8>,
+    original_bytes: Vec<u8>,
     bytes_per_row: usize,
     cursor_offset: usize,
     selection: Option<SelectionRange>,
@@ -28,13 +45,18 @@ pub struct HexEditorState {
     active_pane: ActivePane,
     read_only: bool,
     dirty: bool,
+    dirty_offsets: BTreeSet<usize>,
     pending_nibble: Option<u8>,
+    undo_stack: Vec<StateSnapshot>,
+    redo_stack: Vec<StateSnapshot>,
 }
 
 impl HexEditorState {
+    /// 使用初始字节缓冲区创建状态。
     pub fn new(bytes: Vec<u8>, bytes_per_row: usize) -> Self {
         let has_bytes = !bytes.is_empty();
         Self {
+            original_bytes: bytes.clone(),
             bytes,
             bytes_per_row: bytes_per_row.max(1),
             cursor_offset: 0,
@@ -43,9 +65,55 @@ impl HexEditorState {
             active_pane: ActivePane::Hex,
             read_only: false,
             dirty: false,
+            dirty_offsets: BTreeSet::new(),
             pending_nibble: None,
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
         }
         .with_valid_cursor(has_bytes)
+    }
+
+    fn snapshot(&self) -> StateSnapshot {
+        StateSnapshot {
+            bytes: self.bytes.clone(),
+            cursor_offset: self.cursor_offset,
+            selection: self.selection.clone(),
+            selection_anchor: self.selection_anchor,
+            active_pane: self.active_pane,
+            pending_nibble: self.pending_nibble,
+            dirty_offsets: self.dirty_offsets.clone(),
+            dirty: self.dirty,
+        }
+    }
+
+    fn restore_snapshot(&mut self, snapshot: StateSnapshot) {
+        self.bytes = snapshot.bytes;
+        self.cursor_offset = snapshot.cursor_offset;
+        self.selection = snapshot.selection;
+        self.selection_anchor = snapshot.selection_anchor;
+        self.active_pane = snapshot.active_pane;
+        self.pending_nibble = snapshot.pending_nibble;
+        self.dirty_offsets = snapshot.dirty_offsets;
+        self.dirty = snapshot.dirty;
+    }
+
+    fn push_undo_snapshot(&mut self) {
+        self.undo_stack.push(self.snapshot());
+        self.redo_stack.clear();
+    }
+
+    fn refresh_dirty_offset(&mut self, offset: usize) {
+        if self.bytes[offset] == self.original_bytes[offset] {
+            self.dirty_offsets.remove(&offset);
+        } else {
+            self.dirty_offsets.insert(offset);
+        }
+        self.dirty = !self.dirty_offsets.is_empty();
+    }
+
+    fn write_byte(&mut self, offset: usize, value: u8) {
+        self.bytes[offset] = value;
+        self.refresh_dirty_offset(offset);
     }
 
     fn with_valid_cursor(mut self, has_bytes: bool) -> Self {
@@ -59,6 +127,7 @@ impl HexEditorState {
         self.bytes.len().saturating_sub(1)
     }
 
+    /// 返回当前缓冲区的字节数。
     pub fn len(&self) -> usize {
         self.bytes.len()
     }
@@ -85,6 +154,18 @@ impl HexEditorState {
 
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
+    }
+
+    pub fn is_dirty_offset(&self, offset: usize) -> bool {
+        self.dirty_offsets.contains(&offset)
+    }
+
+    pub fn can_undo(&self) -> bool {
+        !self.undo_stack.is_empty()
+    }
+
+    pub fn can_redo(&self) -> bool {
+        !self.redo_stack.is_empty()
     }
 
     pub fn set_active_pane(&mut self, pane: ActivePane) {
@@ -294,6 +375,7 @@ impl HexEditorState {
         self.read_only
     }
 
+    /// 返回当前是否存在未保存修改。
     pub fn is_dirty(&self) -> bool {
         self.dirty
     }
@@ -321,10 +403,37 @@ impl HexEditorState {
             return Err(EditError::OutOfBounds);
         }
 
-        self.bytes[self.cursor_offset] = value;
+        self.push_undo_snapshot();
+        self.write_byte(self.cursor_offset, value);
         self.pending_nibble = None;
-        self.dirty = true;
         Ok(())
+    }
+
+    /// 将当前内容标记为已保存，并清空脏字节跟踪。
+    pub fn mark_saved(&mut self) {
+        self.original_bytes = self.bytes.clone();
+        self.dirty_offsets.clear();
+        self.dirty = false;
+    }
+
+    /// 撤销最近一次编辑操作。
+    pub fn undo(&mut self) -> bool {
+        let Some(snapshot) = self.undo_stack.pop() else {
+            return false;
+        };
+        self.redo_stack.push(self.snapshot());
+        self.restore_snapshot(snapshot);
+        true
+    }
+
+    /// 重做最近一次撤销的编辑操作。
+    pub fn redo(&mut self) -> bool {
+        let Some(snapshot) = self.redo_stack.pop() else {
+            return false;
+        };
+        self.undo_stack.push(self.snapshot());
+        self.restore_snapshot(snapshot);
+        true
     }
 
     pub fn paste_hex_string(&mut self, text: &str) -> Result<usize, EditError> {
@@ -351,11 +460,12 @@ impl HexEditorState {
         }
 
         let mut written = 0;
+        self.push_undo_snapshot();
         for byte in bytes {
             if self.cursor_offset + written > self.max_offset() {
                 break;
             }
-            self.bytes[self.cursor_offset + written] = byte;
+            self.write_byte(self.cursor_offset + written, byte);
             written += 1;
         }
 
@@ -365,7 +475,6 @@ impl HexEditorState {
 
         self.cursor_offset = (self.cursor_offset + written).min(self.max_offset());
         self.pending_nibble = None;
-        self.dirty = true;
         Ok(written)
     }
 
@@ -424,8 +533,8 @@ impl HexEditorState {
 
         let value = digit.to_digit(16).ok_or(EditError::InvalidHexDigit)? as u8;
         if let Some(high) = self.pending_nibble.take() {
-            self.bytes[self.cursor_offset] = (high << 4) | value;
-            self.dirty = true;
+            self.push_undo_snapshot();
+            self.write_byte(self.cursor_offset, (high << 4) | value);
             self.move_right();
         } else {
             self.pending_nibble = Some(value);
@@ -444,9 +553,9 @@ impl HexEditorState {
             return Err(EditError::NonPrintableAscii);
         }
 
-        self.bytes[self.cursor_offset] = character as u8;
+        self.push_undo_snapshot();
+        self.write_byte(self.cursor_offset, character as u8);
         self.pending_nibble = None;
-        self.dirty = true;
         self.move_right();
         Ok(())
     }
@@ -756,5 +865,46 @@ mod tests {
         state.select_row(1);
 
         assert_eq!(state.selected_range(), Some(&(16..=31)));
+    }
+
+    #[test]
+    fn dirty_offset_clears_when_byte_restored() {
+        let mut state = HexEditorState::new(vec![0xAA], 16);
+
+        state.overwrite_byte(0xFF).unwrap();
+        assert!(state.is_dirty_offset(0));
+        assert!(state.is_dirty());
+
+        state.overwrite_byte(0xAA).unwrap();
+        assert!(!state.is_dirty_offset(0));
+        assert!(!state.is_dirty());
+    }
+
+    #[test]
+    fn undo_and_redo_restore_buffer() {
+        let mut state = HexEditorState::new(vec![0x00, 0x11], 16);
+
+        state.overwrite_byte(0xAA).unwrap();
+        assert_eq!(state.bytes()[0], 0xAA);
+        assert!(state.can_undo());
+
+        assert!(state.undo());
+        assert_eq!(state.bytes()[0], 0x00);
+        assert!(state.can_redo());
+
+        assert!(state.redo());
+        assert_eq!(state.bytes()[0], 0xAA);
+    }
+
+    #[test]
+    fn mark_saved_resets_dirty_tracking() {
+        let mut state = HexEditorState::new(vec![0x00], 16);
+        state.overwrite_byte(0xAB).unwrap();
+        assert!(state.is_dirty());
+
+        state.mark_saved();
+
+        assert!(!state.is_dirty());
+        assert!(!state.is_dirty_offset(0));
     }
 }

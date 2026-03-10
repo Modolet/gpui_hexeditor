@@ -1,6 +1,7 @@
 use gpui::{App, Hsla, Pixels, px};
 use gpui_component::{ActiveTheme, Theme};
 
+/// `HexEditor` 使用的主题派生样式。
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HexEditorStyle {
     pub background: Hsla,
@@ -13,6 +14,8 @@ pub struct HexEditorStyle {
     pub selection_background: Hsla,
     pub current_row_background: Hsla,
     pub current_cell_background: Hsla,
+    pub dirty_cell_background: Hsla,
+    pub dirty_cell_border: Hsla,
     pub focus_ring: Hsla,
     pub radius: Pixels,
     pub row_height: Pixels,
@@ -34,6 +37,8 @@ impl HexEditorStyle {
             selection_background: theme.selection.opacity(0.9),
             current_row_background: theme.accent.opacity(0.28),
             current_cell_background: theme.primary.opacity(0.16),
+            dirty_cell_background: theme.danger.opacity(0.24),
+            dirty_cell_border: theme.danger,
             focus_ring: theme.ring,
             radius: px(4.),
             row_height: px(19.),

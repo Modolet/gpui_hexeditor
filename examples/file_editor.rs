@@ -41,6 +41,10 @@ impl FileEditorDemo {
     fn save(&mut self, cx: &mut Context<Self>) -> std::io::Result<()> {
         let bytes = self.editor.read_with(cx, |editor, _| editor.bytes_cloned());
         fs::write(&self.path, bytes)?;
+        self.editor.update(cx, |editor, cx| {
+            editor.mark_saved();
+            cx.notify();
+        });
         self.message = format!("已保存到 {}", self.path.display()).into();
         Ok(())
     }

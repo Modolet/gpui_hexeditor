@@ -17,6 +17,7 @@ pub struct HexEditor {
 }
 
 impl HexEditor {
+    /// 创建一个新的可编辑 `HexEditor` 组件。
     pub fn new(buffer: Vec<u8>, config: HexEditorConfig, cx: &mut Context<Self>) -> Self {
         let mut state = HexEditorState::new(buffer, config.bytes_per_row);
         state.set_read_only(config.read_only);
@@ -46,6 +47,21 @@ impl HexEditor {
     pub fn with_style(mut self, style: HexEditorStyle) -> Self {
         self.style = Some(style);
         self
+    }
+
+    /// 将当前内容标记为已保存，清空脏字节高亮。
+    pub fn mark_saved(&mut self) {
+        self.state.mark_saved();
+    }
+
+    /// 撤销最近一次编辑操作。
+    pub fn undo(&mut self) -> bool {
+        self.state.undo()
+    }
+
+    /// 重做最近一次撤销操作。
+    pub fn redo(&mut self) -> bool {
+        self.state.redo()
     }
 
     pub fn bytes_cloned(&self) -> Vec<u8> {
@@ -160,6 +176,29 @@ impl HexEditor {
         {
             if let Ok(Some(text)) = self.state.cut_selection_hex() {
                 cx.write_to_clipboard(ClipboardItem::new_string(text));
+                cx.notify();
+            }
+            return;
+        }
+
+        if (modifiers.control || modifiers.platform)
+            && event.keystroke.key.eq_ignore_ascii_case("z")
+        {
+            let changed = if modifiers.shift {
+                self.state.redo()
+            } else {
+                self.state.undo()
+            };
+            if changed {
+                cx.notify();
+            }
+            return;
+        }
+
+        if (modifiers.control || modifiers.platform)
+            && event.keystroke.key.eq_ignore_ascii_case("y")
+        {
+            if self.state.redo() {
                 cx.notify();
             }
             return;
@@ -325,6 +364,7 @@ impl HexEditor {
     ) -> impl IntoElement {
         let is_cursor = offset == self.state.cursor_offset();
         let is_selected = self.state.is_selected(offset);
+        let is_dirty = self.state.is_dirty_offset(offset);
         let cell = div()
             .id(("hex", offset))
             .w(px(36.))
@@ -366,6 +406,14 @@ impl HexEditor {
             cell
         };
 
+        let cell = if is_dirty {
+            cell.bg(style.dirty_cell_background)
+                .border_1()
+                .border_color(style.dirty_cell_border)
+        } else {
+            cell
+        };
+
         let cell = if is_cursor {
             cell.bg(style.current_cell_background)
                 .border_1()
@@ -386,6 +434,7 @@ impl HexEditor {
     ) -> impl IntoElement {
         let is_cursor = offset == self.state.cursor_offset();
         let is_selected = self.state.is_selected(offset);
+        let is_dirty = self.state.is_dirty_offset(offset);
         let cell = div()
             .id(("ascii", offset))
             .w(px(12.))
@@ -420,6 +469,14 @@ impl HexEditor {
 
         let cell = if is_selected {
             cell.bg(style.selection_background)
+        } else {
+            cell
+        };
+
+        let cell = if is_dirty {
+            cell.bg(style.dirty_cell_background)
+                .border_1()
+                .border_color(style.dirty_cell_border)
         } else {
             cell
         };
