@@ -25,8 +25,8 @@ impl HexEditorStyle {
     pub fn from_theme(theme: &Theme) -> Self {
         Self {
             background: theme.background,
-            panel_background: theme.secondary.opacity(0.48),
-            gutter_background: theme.muted.opacity(0.62),
+            panel_background: theme.secondary.opacity(0.42),
+            gutter_background: theme.muted.opacity(0.56),
             border: theme.border,
             text: theme.foreground,
             muted_text: theme.muted_foreground,
@@ -35,11 +35,11 @@ impl HexEditorStyle {
             current_row_background: theme.accent.opacity(0.28),
             current_cell_background: theme.primary.opacity(0.16),
             focus_ring: theme.ring,
-            radius: px(5.),
-            row_height: px(22.),
-            cell_radius: px(4.),
-            section_gap: px(8.),
-            mono_font_size: px(12.),
+            radius: px(4.),
+            row_height: px(19.),
+            cell_radius: px(3.),
+            section_gap: px(6.),
+            mono_font_size: px(11.),
         }
     }
 

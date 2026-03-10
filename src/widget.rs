@@ -1,7 +1,7 @@
 use gpui::{
     App, ClipboardItem, Context, Entity, FocusHandle, Focusable, InteractiveElement, IntoElement,
     KeyDownEvent, MouseButton, MouseMoveEvent, MouseUpEvent, ParentElement, Render, SharedString,
-    Styled, Window, div, prelude::FluentBuilder,
+    StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_component::{ActiveTheme, label::Label};
 
@@ -235,8 +235,8 @@ impl HexEditor {
             .flex_row()
             .justify_between()
             .items_center()
-            .px_2()
-            .py_1()
+            .px_1p5()
+            .py_0p5()
             .rounded_t(style.radius)
             .border_b_1()
             .border_color(style.border)
@@ -260,7 +260,7 @@ impl HexEditor {
                 div()
                     .flex()
                     .items_center()
-                    .gap_2()
+                    .gap_1()
                     .text_xs()
                     .text_color(style.muted_text)
                     .child(format!("模式 {mode}"))
@@ -279,14 +279,14 @@ impl HexEditor {
             .flex()
             .flex_row()
             .items_center()
-            .px_2()
-            .py_1()
+            .px_1p5()
+            .py_0p5()
             .border_b_1()
             .border_color(style.border.opacity(0.65))
             .bg(style.gutter_background)
             .child(
                 div()
-                    .w_20()
+                    .w(px(72.))
                     .text_xs()
                     .text_color(style.muted_text)
                     .child("Offset"),
@@ -298,7 +298,7 @@ impl HexEditor {
                     .gap_0p5()
                     .children((0..self.state.bytes_per_row()).map(|index| {
                         div()
-                            .w_10()
+                            .w(px(36.))
                             .text_center()
                             .text_xs()
                             .text_color(style.muted_text)
@@ -308,7 +308,7 @@ impl HexEditor {
             .when(self.config.show_ascii, |this| {
                 this.child(
                     div()
-                        .w_40()
+                        .w(px(144.))
                         .text_xs()
                         .text_color(style.muted_text)
                         .child("ASCII"),
@@ -327,7 +327,7 @@ impl HexEditor {
         let is_selected = self.state.is_selected(offset);
         let cell = div()
             .id(("hex", offset))
-            .w_10()
+            .w(px(36.))
             .px_0p5()
             .py_0p5()
             .text_center()
@@ -336,12 +336,6 @@ impl HexEditor {
             .rounded(style.cell_radius)
             .text_color(style.text)
             .cursor_pointer()
-            .when(is_selected, |this| this.bg(style.selection_background))
-            .when(is_cursor, |this| {
-                this.bg(style.current_cell_background)
-                    .border_1()
-                    .border_color(style.focus_ring)
-            })
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(move |this, event: &gpui::MouseDownEvent, window, cx| {
@@ -394,18 +388,12 @@ impl HexEditor {
         let is_selected = self.state.is_selected(offset);
         let cell = div()
             .id(("ascii", offset))
-            .w_3()
+            .w(px(12.))
             .text_center()
             .font_family("DejaVu Sans Mono")
             .text_xs()
             .rounded(style.cell_radius)
             .cursor_pointer()
-            .when(is_selected, |this| this.bg(style.selection_background))
-            .when(is_cursor, |this| {
-                this.bg(style.current_cell_background)
-                    .border_1()
-                    .border_color(style.focus_ring)
-            })
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(move |this, event: &gpui::MouseDownEvent, window, cx| {
@@ -483,18 +471,17 @@ impl HexEditor {
             );
         }
 
-        div()
+        let row = div()
             .flex()
             .flex_row()
             .items_center()
             .min_h(style.row_height)
-            .px_2()
+            .px_1p5()
             .py_0p5()
-            .gap_2()
-            .when(is_current_row, |this| this.bg(style.current_row_background))
+            .gap_1p5()
             .child(
                 div()
-                    .w_20()
+                    .w(px(72.))
                     .font_family("DejaVu Sans Mono")
                     .text_xs()
                     .text_color(style.muted_text)
@@ -502,8 +489,14 @@ impl HexEditor {
             )
             .child(div().flex().flex_1().gap_0p5().children(hex_cells))
             .when(self.config.show_ascii, |this| {
-                this.child(div().w_40().flex().gap_0p5().children(ascii_cells))
-            })
+                this.child(div().w(px(144.)).flex().gap_0p5().children(ascii_cells))
+            });
+
+        if is_current_row {
+            row.bg(style.current_row_background)
+        } else {
+            row
+        }
     }
 
     fn render_status_bar(&self, style: HexEditorStyle) -> impl IntoElement {
@@ -513,8 +506,8 @@ impl HexEditor {
             .flex_row()
             .justify_between()
             .items_center()
-            .px_2()
-            .py_1()
+            .px_1p5()
+            .py_0p5()
             .rounded_b(style.radius)
             .border_t_1()
             .border_color(style.border)
@@ -550,15 +543,14 @@ impl Focusable for HexEditor {
 impl Render for HexEditor {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let style = self.resolved_style(cx);
-        let visible_rows = self.config.visible_rows.min(self.state.row_count().max(1));
-        let current_row = self.state.offset_to_row_col(self.state.cursor_offset()).0;
-        let start_row = current_row.saturating_sub(visible_rows / 2);
-        let end_row = (start_row + visible_rows).min(self.state.row_count());
         let is_focused = self.focus_handle.is_focused(window);
-        let mut rows = Vec::with_capacity(end_row.saturating_sub(start_row));
-        for row in start_row..end_row {
+        let row_count = self.state.row_count();
+        let mut rows = Vec::with_capacity(row_count);
+        for row in 0..row_count {
             rows.push(self.render_row(row, style, cx).into_any_element());
         }
+        let content_height =
+            style.row_height * self.config.visible_rows as f32 + style.section_gap * 2.0;
 
         let root = div()
             .id("hex-editor")
@@ -581,15 +573,18 @@ impl Render for HexEditor {
             root = root.child(self.render_toolbar(style));
         }
         root = root.child(self.render_header(style));
-        root = root.child(
-            div()
-                .flex()
-                .flex_col()
-                .gap_0p5()
-                .p_1()
-                .bg(cx.theme().background)
-                .children(rows),
-        );
+        let scroll = div()
+            .id("hex-editor-scroll")
+            .h(content_height)
+            .overflow_y_scroll()
+            .overflow_x_hidden()
+            .flex()
+            .flex_col()
+            .gap_0p5()
+            .p_0p5()
+            .bg(cx.theme().background)
+            .children(rows);
+        root = root.child(scroll);
         if self.config.show_status_bar {
             root = root.child(self.render_status_bar(style));
         }

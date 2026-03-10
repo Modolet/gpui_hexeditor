@@ -7,6 +7,7 @@
 - 现代简洁风布局
 - 兼容 `gpui_component` theme 的语义配色
 - 地址栏、Hex 区、ASCII 区、状态栏
+- 内容区组件内部滚动，工具栏和状态栏固定
 - 光标、选区、Hex/ASCII 编辑的状态模型
 - 示例应用：`cargo run --example basic`
 - 本地文件编辑示例：`cargo run --example file_editor -- /path/to/file.bin`
@@ -42,6 +43,7 @@ fn build_editor(window: &mut Window, cx: &mut Context<MyView>) {
 - `Ctrl/Cmd + X` 剪切选区为十六进制文本并清零原字节
 - `Ctrl/Cmd + A` 全选全部字节
 - 双击 Hex/ASCII 单元格可选中整行
+- 内容区支持组件内部纵向滚动
 - 方向键、`Home`、`End`、`PageUp`、`PageDown` 移动光标
 - Hex 区直接输入 `0-9A-F`，按半字节连续写入
 - ASCII 区直接输入可见字符覆盖字节
