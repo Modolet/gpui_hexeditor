@@ -33,6 +33,7 @@ fn build_editor(window: &mut Window, cx: &mut Context<MyView>) {
 
 - 纯展示：`cargo run --example basic`
 - 打开并保存本地文件：`cargo run --example file_editor -- ./sample.bin`
+- 综合能力展厅：`cargo run --example showcase`
 
 ## 当前交互
 
