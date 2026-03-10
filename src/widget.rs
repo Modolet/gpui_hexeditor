@@ -69,6 +69,17 @@ impl HexEditor {
         self.state.bytes_cloned()
     }
 
+    pub fn set_bytes(&mut self, bytes: Vec<u8>) {
+        self.state.replace_bytes(bytes);
+        if !self.config.show_ascii && self.state.active_pane() == ActivePane::Ascii {
+            self.state.set_active_pane(ActivePane::Hex);
+        }
+    }
+
+    pub fn is_dirty(&self) -> bool {
+        self.state.is_dirty()
+    }
+
     pub fn len(&self) -> usize {
         self.state.len()
     }
@@ -82,7 +93,9 @@ impl HexEditor {
     }
 
     pub fn apply_ascii_char(&mut self, character: char) {
-        let _ = self.state.apply_ascii_char(character);
+        if self.config.show_ascii {
+            let _ = self.state.apply_ascii_char(character);
+        }
     }
 
     pub fn move_left(&mut self) {
@@ -244,12 +257,18 @@ impl HexEditor {
         }
 
         if let Some(text) = event.keystroke.key_char.as_deref() {
+            if !self.config.show_ascii && self.state.active_pane() == ActivePane::Ascii {
+                self.state.set_active_pane(ActivePane::Hex);
+            }
             if self.state.handle_text_input(text) {
                 cx.notify();
                 return;
             }
         }
 
+        if !self.config.show_ascii && self.state.active_pane() == ActivePane::Ascii {
+            self.state.set_active_pane(ActivePane::Hex);
+        }
         if self.state.handle_text_input(event.keystroke.key.as_str()) {
             cx.notify();
         }

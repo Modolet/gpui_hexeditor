@@ -395,6 +395,13 @@ impl HexEditorState {
         self.bytes.clone()
     }
 
+    pub fn replace_bytes(&mut self, bytes: Vec<u8>) {
+        let read_only = self.read_only;
+        let bytes_per_row = self.bytes_per_row;
+        *self = Self::new(bytes, bytes_per_row);
+        self.read_only = read_only;
+    }
+
     pub fn overwrite_byte(&mut self, value: u8) -> Result<(), EditError> {
         if self.read_only {
             return Err(EditError::ReadOnly);
@@ -906,5 +913,27 @@ mod tests {
 
         assert!(!state.is_dirty());
         assert!(!state.is_dirty_offset(0));
+    }
+
+    #[test]
+    fn replace_bytes_resets_dirty_history_and_keeps_layout_flags() {
+        let mut state = HexEditorState::new(vec![0x00, 0x11], 8);
+        state.set_read_only(true);
+        state.overwrite_byte(0xAA).err();
+        state.set_read_only(false);
+        state.overwrite_byte(0xAA).unwrap();
+        assert!(state.is_dirty());
+
+        state.set_read_only(true);
+        state.replace_bytes(vec![0xDE, 0xAD, 0xBE, 0xEF]);
+
+        assert_eq!(state.bytes(), &[0xDE, 0xAD, 0xBE, 0xEF]);
+        assert_eq!(state.bytes_per_row(), 8);
+        assert!(state.is_read_only());
+        assert!(!state.is_dirty());
+        assert!(!state.can_undo());
+        assert!(!state.can_redo());
+        assert_eq!(state.cursor_offset(), 0);
+        assert_eq!(state.active_pane(), ActivePane::Hex);
     }
 }
