@@ -1,9 +1,10 @@
 use gpui::{
     App, ClipboardItem, Context, Entity, FocusHandle, Focusable, InteractiveElement, IntoElement,
     KeyDownEvent, MouseButton, MouseMoveEvent, MouseUpEvent, ParentElement, Render, SharedString,
-    StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    Styled, Window, div, prelude::FluentBuilder, px,
 };
-use gpui_component::{ActiveTheme, label::Label};
+use gpui_component::{ActiveTheme, label::Label, v_virtual_list};
+use std::rc::Rc;
 
 use crate::{HexEditorConfig, HexEditorState, HexEditorStyle, state::ActivePane};
 
@@ -602,10 +603,11 @@ impl Render for HexEditor {
         let style = self.resolved_style(cx);
         let is_focused = self.focus_handle.is_focused(window);
         let row_count = self.state.row_count();
-        let mut rows = Vec::with_capacity(row_count);
-        for row in 0..row_count {
-            rows.push(self.render_row(row, style, cx).into_any_element());
-        }
+        let row_sizes = Rc::new(
+            (0..row_count)
+                .map(|_| gpui::size(px(0.), style.row_height))
+                .collect::<Vec<_>>(),
+        );
         let content_height =
             style.row_height * self.config.visible_rows as f32 + style.section_gap * 2.0;
 
@@ -633,14 +635,25 @@ impl Render for HexEditor {
         let scroll = div()
             .id("hex-editor-scroll")
             .h(content_height)
-            .overflow_y_scroll()
-            .overflow_x_hidden()
+            .overflow_hidden()
             .flex()
             .flex_col()
             .gap_0p5()
             .p_0p5()
             .bg(cx.theme().background)
-            .children(rows);
+            .child(
+                v_virtual_list(
+                    cx.entity(),
+                    "hex-editor-rows",
+                    row_sizes,
+                    move |editor, visible_range, _window, cx| {
+                        visible_range
+                            .map(|row| editor.render_row(row, style, cx).into_any_element())
+                            .collect::<Vec<_>>()
+                    },
+                )
+                .size_full(),
+            );
         root = root.child(scroll);
         if self.config.show_status_bar {
             root = root.child(self.render_status_bar(style));
