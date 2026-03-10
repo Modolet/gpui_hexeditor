@@ -8,6 +8,7 @@ pub enum EditError {
     InvalidHexDigit,
     NonPrintableAscii,
     OutOfBounds,
+    InvalidHexPayload,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -232,6 +233,11 @@ impl HexEditorState {
         )
     }
 
+    pub fn selected_range_label(&self) -> Option<String> {
+        let range = self.selection.as_ref()?;
+        Some(format!("0x{:08X}-0x{:08X}", range.start(), range.end()))
+    }
+
     pub fn set_read_only(&mut self, read_only: bool) {
         self.read_only = read_only;
         if read_only {
@@ -274,6 +280,48 @@ impl HexEditorState {
         self.pending_nibble = None;
         self.dirty = true;
         Ok(())
+    }
+
+    pub fn paste_hex_string(&mut self, text: &str) -> Result<usize, EditError> {
+        if self.read_only {
+            return Err(EditError::ReadOnly);
+        }
+        if self.is_empty() {
+            return Err(EditError::OutOfBounds);
+        }
+
+        let compact = text
+            .chars()
+            .filter(|ch| !ch.is_whitespace())
+            .collect::<String>();
+        if compact.is_empty() || compact.len() % 2 != 0 {
+            return Err(EditError::InvalidHexPayload);
+        }
+
+        let mut bytes = Vec::new();
+        for chunk in compact.as_bytes().chunks(2) {
+            let hex = std::str::from_utf8(chunk).map_err(|_| EditError::InvalidHexPayload)?;
+            let byte = u8::from_str_radix(hex, 16).map_err(|_| EditError::InvalidHexPayload)?;
+            bytes.push(byte);
+        }
+
+        let mut written = 0;
+        for byte in bytes {
+            if self.cursor_offset + written > self.max_offset() {
+                break;
+            }
+            self.bytes[self.cursor_offset + written] = byte;
+            written += 1;
+        }
+
+        if written == 0 {
+            return Err(EditError::OutOfBounds);
+        }
+
+        self.cursor_offset = (self.cursor_offset + written).min(self.max_offset());
+        self.pending_nibble = None;
+        self.dirty = true;
+        Ok(written)
     }
 
     pub fn delete(&mut self) -> Result<(), EditError> {
@@ -599,5 +647,39 @@ mod tests {
 
         assert_eq!(state.selection_anchor(), Some(5));
         assert_eq!(state.selected_range(), Some(&(5..=9)));
+    }
+
+    #[test]
+    fn paste_hex_string_overwrites_contiguous_bytes() {
+        let mut state = HexEditorState::new(vec![0x00, 0x00, 0x00, 0x00], 16);
+        state.set_cursor(1);
+
+        let written = state.paste_hex_string("DE AD").unwrap();
+
+        assert_eq!(written, 2);
+        assert_eq!(state.bytes(), &[0x00, 0xDE, 0xAD, 0x00]);
+        assert_eq!(state.cursor_offset(), 3);
+    }
+
+    #[test]
+    fn paste_hex_string_accepts_compact_hex() {
+        let mut state = HexEditorState::new(vec![0x00, 0x00, 0x00], 16);
+
+        let written = state.paste_hex_string("BEEF").unwrap();
+
+        assert_eq!(written, 2);
+        assert_eq!(state.bytes(), &[0xBE, 0xEF, 0x00]);
+    }
+
+    #[test]
+    fn selected_range_label_shows_hex_bounds() {
+        let mut state = HexEditorState::new(vec![0; 32], 16);
+        state.begin_selection(2);
+        state.update_selection(6);
+
+        assert_eq!(
+            state.selected_range_label().as_deref(),
+            Some("0x00000002-0x00000006")
+        );
     }
 }

@@ -111,6 +111,25 @@ impl HexEditor {
         }
     }
 
+    fn shift_click_select(
+        &mut self,
+        offset: usize,
+        pane: ActivePane,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.state.set_active_pane(pane);
+        let anchor = self
+            .state
+            .selection_anchor()
+            .unwrap_or(self.state.cursor_offset());
+        self.state.begin_selection(anchor);
+        self.state.update_selection(offset);
+        self.dragging_selection = false;
+        window.focus(&self.focus_handle);
+        cx.notify();
+    }
+
     fn extend_selection_with_key(&mut self, key: &str) -> bool {
         let anchor = self
             .state
@@ -132,6 +151,19 @@ impl HexEditor {
         {
             if let Some(text) = self.state.selected_hex_string() {
                 cx.write_to_clipboard(ClipboardItem::new_string(text));
+            }
+            return;
+        }
+
+        if (modifiers.control || modifiers.platform)
+            && event.keystroke.key.eq_ignore_ascii_case("v")
+        {
+            if let Some(item) = cx.read_from_clipboard() {
+                if let Some(text) = item.text() {
+                    if self.state.paste_hex_string(&text).is_ok() {
+                        cx.notify();
+                    }
+                }
             }
             return;
         }
@@ -295,13 +327,11 @@ impl HexEditor {
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(move |this, event: &gpui::MouseDownEvent, window, cx| {
-                    this.begin_pointer_selection(
-                        offset,
-                        ActivePane::Hex,
-                        event.modifiers.shift,
-                        window,
-                        cx,
-                    );
+                    if event.modifiers.shift {
+                        this.shift_click_select(offset, ActivePane::Hex, window, cx);
+                    } else {
+                        this.begin_pointer_selection(offset, ActivePane::Hex, false, window, cx);
+                    }
                 }),
             );
         let cell = cell.on_mouse_move(cx.listener(move |this, event: &MouseMoveEvent, _, cx| {
@@ -353,13 +383,11 @@ impl HexEditor {
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(move |this, event: &gpui::MouseDownEvent, window, cx| {
-                    this.begin_pointer_selection(
-                        offset,
-                        ActivePane::Ascii,
-                        event.modifiers.shift,
-                        window,
-                        cx,
-                    );
+                    if event.modifiers.shift {
+                        this.shift_click_select(offset, ActivePane::Ascii, window, cx);
+                    } else {
+                        this.begin_pointer_selection(offset, ActivePane::Ascii, false, window, cx);
+                    }
                 }),
             );
         let cell = cell.on_mouse_move(cx.listener(move |this, event: &MouseMoveEvent, _, cx| {
@@ -465,7 +493,10 @@ impl HexEditor {
                 col + 1
             ))
             .child(format!(
-                "选中 {} B · {}",
+                "{} · 选中 {} B · {}",
+                self.state
+                    .selected_range_label()
+                    .unwrap_or_else(|| "无选区".to_string()),
                 self.state.selection_len(),
                 if self.state.is_dirty() {
                     "已修改"
