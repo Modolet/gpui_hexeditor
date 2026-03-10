@@ -200,6 +200,32 @@ impl HexEditorState {
         self.selection_anchor = None;
     }
 
+    pub fn select_all(&mut self) {
+        if self.is_empty() {
+            self.clear_selection();
+            return;
+        }
+
+        self.selection_anchor = Some(0);
+        self.selection = Some(0..=self.max_offset());
+        self.cursor_offset = self.max_offset();
+        self.pending_nibble = None;
+    }
+
+    pub fn select_row(&mut self, row: usize) {
+        if self.is_empty() {
+            self.clear_selection();
+            return;
+        }
+
+        let start = self.row_col_to_offset(row, 0);
+        let end = self.row_col_to_offset(row, self.bytes_per_row.saturating_sub(1));
+        self.selection_anchor = Some(start);
+        self.selection = Some(start..=end);
+        self.cursor_offset = end;
+        self.pending_nibble = None;
+    }
+
     pub fn selection_anchor(&self) -> Option<usize> {
         self.selection_anchor
     }
@@ -236,6 +262,25 @@ impl HexEditorState {
     pub fn selected_range_label(&self) -> Option<String> {
         let range = self.selection.as_ref()?;
         Some(format!("0x{:08X}-0x{:08X}", range.start(), range.end()))
+    }
+
+    pub fn cut_selection_hex(&mut self) -> Result<Option<String>, EditError> {
+        if self.read_only {
+            return Err(EditError::ReadOnly);
+        }
+
+        let Some(range) = self.selection.clone() else {
+            return Ok(None);
+        };
+
+        let text = self.selected_hex_string();
+        for offset in range.clone() {
+            self.bytes[offset] = 0x00;
+        }
+        self.cursor_offset = *range.start();
+        self.dirty = true;
+        self.pending_nibble = None;
+        Ok(text)
     }
 
     pub fn set_read_only(&mut self, read_only: bool) {
@@ -681,5 +726,35 @@ mod tests {
             state.selected_range_label().as_deref(),
             Some("0x00000002-0x00000006")
         );
+    }
+
+    #[test]
+    fn select_all_covers_whole_buffer() {
+        let mut state = HexEditorState::new(vec![0; 8], 4);
+        state.select_all();
+
+        assert_eq!(state.selected_range(), Some(&(0..=7)));
+        assert_eq!(state.selection_len(), 8);
+    }
+
+    #[test]
+    fn cut_selection_hex_returns_text_and_zeroes_bytes() {
+        let mut state = HexEditorState::new(vec![0xDE, 0xAD, 0xBE, 0xEF], 16);
+        state.begin_selection(1);
+        state.update_selection(2);
+
+        let cut = state.cut_selection_hex().unwrap();
+
+        assert_eq!(cut.as_deref(), Some("AD BE"));
+        assert_eq!(state.bytes(), &[0xDE, 0x00, 0x00, 0xEF]);
+        assert_eq!(state.cursor_offset(), 1);
+    }
+
+    #[test]
+    fn select_row_marks_entire_visual_row() {
+        let mut state = HexEditorState::new((0u8..=31).collect(), 16);
+        state.select_row(1);
+
+        assert_eq!(state.selected_range(), Some(&(16..=31)));
     }
 }

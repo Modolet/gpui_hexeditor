@@ -156,6 +156,24 @@ impl HexEditor {
         }
 
         if (modifiers.control || modifiers.platform)
+            && event.keystroke.key.eq_ignore_ascii_case("x")
+        {
+            if let Ok(Some(text)) = self.state.cut_selection_hex() {
+                cx.write_to_clipboard(ClipboardItem::new_string(text));
+                cx.notify();
+            }
+            return;
+        }
+
+        if (modifiers.control || modifiers.platform)
+            && event.keystroke.key.eq_ignore_ascii_case("a")
+        {
+            self.state.select_all();
+            cx.notify();
+            return;
+        }
+
+        if (modifiers.control || modifiers.platform)
             && event.keystroke.key.eq_ignore_ascii_case("v")
         {
             if let Some(item) = cx.read_from_clipboard() {
@@ -327,6 +345,14 @@ impl HexEditor {
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(move |this, event: &gpui::MouseDownEvent, window, cx| {
+                    if event.click_count >= 2 {
+                        let row = this.state.offset_to_row_col(offset).0;
+                        this.state.set_active_pane(ActivePane::Hex);
+                        this.state.select_row(row);
+                        window.focus(&this.focus_handle);
+                        cx.notify();
+                        return;
+                    }
                     if event.modifiers.shift {
                         this.shift_click_select(offset, ActivePane::Hex, window, cx);
                     } else {
@@ -383,6 +409,14 @@ impl HexEditor {
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(move |this, event: &gpui::MouseDownEvent, window, cx| {
+                    if event.click_count >= 2 {
+                        let row = this.state.offset_to_row_col(offset).0;
+                        this.state.set_active_pane(ActivePane::Ascii);
+                        this.state.select_row(row);
+                        window.focus(&this.focus_handle);
+                        cx.notify();
+                        return;
+                    }
                     if event.modifiers.shift {
                         this.shift_click_select(offset, ActivePane::Ascii, window, cx);
                     } else {
