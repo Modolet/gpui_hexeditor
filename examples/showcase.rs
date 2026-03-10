@@ -35,19 +35,16 @@ impl Showcase {
     }
 
     fn sample_bytes() -> Vec<u8> {
+        Self::sample_bytes_with_limit(224)
+    }
+
+    fn sample_bytes_with_limit(limit: usize) -> Vec<u8> {
         let mut bytes = Vec::new();
         bytes.extend_from_slice(b"GPUI HEXEDITOR SHOWCASE\0");
         bytes.extend(0u8..=63);
         bytes.extend_from_slice(b"Type hex digits, ASCII chars, copy/paste hex, undo/redo.\n");
         bytes.extend((0..128).map(|index| (index as u8).wrapping_mul(3)));
-        bytes
-    }
-
-    fn dirty_sample_bytes() -> Vec<u8> {
-        let mut bytes = Self::sample_bytes();
-        for byte in bytes.iter_mut().take(8) {
-            *byte ^= 0x3F;
-        }
+        bytes.truncate(limit);
         bytes
     }
 
@@ -68,9 +65,9 @@ impl Showcase {
 
         cx.new(|cx| {
             HexEditor::new(
-                Self::sample_bytes(),
+                Self::sample_bytes_with_limit(72),
                 HexEditorConfig::default()
-                    .with_visible_rows(8)
+                    .with_visible_rows(5)
                     .with_bytes_per_row(16),
                 cx,
             )
@@ -82,9 +79,9 @@ impl Showcase {
     fn build_readonly_editor(cx: &mut Context<Self>) -> Entity<HexEditor> {
         cx.new(|cx| {
             HexEditor::new(
-                Self::sample_bytes(),
+                Self::sample_bytes_with_limit(64),
                 HexEditorConfig::default()
-                    .with_visible_rows(8)
+                    .with_visible_rows(4)
                     .with_bytes_per_row(16)
                     .read_only(true),
                 cx,
@@ -96,9 +93,9 @@ impl Showcase {
     fn build_wide_editor(cx: &mut Context<Self>) -> Entity<HexEditor> {
         cx.new(|cx| {
             HexEditor::new(
-                Self::sample_bytes(),
+                Self::sample_bytes_with_limit(96),
                 HexEditorConfig::default()
-                    .with_visible_rows(8)
+                    .with_visible_rows(4)
                     .with_bytes_per_row(32),
                 cx,
             )
@@ -117,10 +114,10 @@ impl Showcase {
 
         cx.new(|cx| {
             let mut config = HexEditorConfig::default()
-                .with_visible_rows(8)
+                .with_visible_rows(4)
                 .with_bytes_per_row(12);
             config.show_ascii = false;
-            HexEditor::new(Self::dirty_sample_bytes(), config, cx)
+            HexEditor::new(Self::sample_bytes_with_limit(60), config, cx)
                 .with_title("No ASCII + Custom Dirty Color")
                 .with_style(custom_style)
         })
