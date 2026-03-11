@@ -7,6 +7,7 @@ pub struct HexEditorConfig {
     pub show_status_bar: bool,
     pub read_only: bool,
     pub visible_rows: usize,
+    pub fill_container: bool,
 }
 
 impl HexEditorConfig {
@@ -27,6 +28,12 @@ impl HexEditorConfig {
         self.visible_rows = visible_rows.max(1);
         self
     }
+
+    /// 设置是否填满父容器高度。
+    pub fn fill_container(mut self, fill_container: bool) -> Self {
+        self.fill_container = fill_container;
+        self
+    }
 }
 
 impl Default for HexEditorConfig {
@@ -38,6 +45,7 @@ impl Default for HexEditorConfig {
             show_status_bar: true,
             read_only: false,
             visible_rows: 20,
+            fill_container: false,
         }
     }
 }

@@ -285,9 +285,9 @@ impl HexEditor {
 
     fn render_toolbar(&self, style: HexEditorStyle) -> impl IntoElement {
         let mode = if self.config.read_only {
-            "只读"
+            "Read Only"
         } else {
-            "编辑"
+            "Editable"
         };
         div()
             .flex()
@@ -308,7 +308,7 @@ impl HexEditor {
                     .child(Label::new(self.title.clone()))
                     .child(
                         Label::new(format!(
-                            "{} B · {} / 行",
+                            "{} B · {} / row",
                             self.state.len(),
                             self.state.bytes_per_row()
                         ))
@@ -322,9 +322,9 @@ impl HexEditor {
                     .gap_1()
                     .text_xs()
                     .text_color(style.muted_text)
-                    .child(format!("模式 {mode}"))
+                    .child(format!("Mode {mode}"))
                     .child(format!(
-                        "视图 {}",
+                        "View {}",
                         match self.state.active_pane() {
                             ActivePane::Hex => "Hex",
                             ActivePane::Ascii => "ASCII",
@@ -591,7 +591,7 @@ impl HexEditor {
             .bg(style.panel_background)
             .text_xs()
             .child(format!(
-                "Offset 0x{:08X} · 行 {} 列 {}",
+                "Offset 0x{:08X} · Row {} Col {}",
                 self.state.cursor_offset(),
                 row + 1,
                 col + 1
@@ -600,12 +600,12 @@ impl HexEditor {
                 "{} · 选中 {} B · {}",
                 self.state
                     .selected_range_label()
-                    .unwrap_or_else(|| "无选区".to_string()),
+                    .unwrap_or_else(|| "No Selection".to_string()),
                 self.state.selection_len(),
                 if self.state.is_dirty() {
-                    "已修改"
+                    "Modified"
                 } else {
-                    "未修改"
+                    "Clean"
                 }
             ))
     }
@@ -627,8 +627,8 @@ impl Render for HexEditor {
                 .map(|_| gpui::size(px(0.), style.row_height))
                 .collect::<Vec<_>>(),
         );
-        let content_height =
-            style.row_height * self.config.visible_rows as f32 + style.section_gap * 2.0;
+        let visible_rows = self.config.visible_rows.min(row_count.max(1));
+        let content_height = style.row_height * visible_rows as f32 + style.section_gap * 2.0;
 
         let root = div()
             .id("hex-editor")
@@ -651,9 +651,8 @@ impl Render for HexEditor {
             root = root.child(self.render_toolbar(style));
         }
         root = root.child(self.render_header(style));
-        let scroll = div()
+        let mut scroll = div()
             .id("hex-editor-scroll")
-            .h(content_height)
             .overflow_hidden()
             .flex()
             .flex_col()
@@ -673,6 +672,11 @@ impl Render for HexEditor {
                 )
                 .size_full(),
             );
+        scroll = if self.config.fill_container {
+            scroll.flex_1().min_h_0()
+        } else {
+            scroll.h(content_height)
+        };
         root = root.child(scroll);
         if self.config.show_status_bar {
             root = root.child(self.render_status_bar(style));
