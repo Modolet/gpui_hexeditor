@@ -8,6 +8,7 @@ use std::rc::Rc;
 
 use crate::{HexEditorConfig, HexEditorState, HexEditorStyle, state::ActivePane};
 
+/// A reusable GPUI hex editor widget.
 pub struct HexEditor {
     state: HexEditorState,
     config: HexEditorConfig,
@@ -25,6 +26,7 @@ impl HexEditor {
         Self::from_state(state, config, cx)
     }
 
+    /// Create an editor from an existing state object.
     pub fn from_state(
         state: HexEditorState,
         config: HexEditorConfig,
@@ -40,11 +42,13 @@ impl HexEditor {
         }
     }
 
+    /// Set the title shown in the optional toolbar.
     pub fn with_title(mut self, title: impl Into<SharedString>) -> Self {
         self.title = title.into();
         self
     }
 
+    /// Override the resolved theme-based style.
     pub fn with_style(mut self, style: HexEditorStyle) -> Self {
         self.style = Some(style);
         self
@@ -65,10 +69,12 @@ impl HexEditor {
         self.state.redo()
     }
 
+    /// Return a cloned snapshot of the current buffer.
     pub fn bytes_cloned(&self) -> Vec<u8> {
         self.state.bytes_cloned()
     }
 
+    /// Replace the entire buffer and reset dirty/undo state.
     pub fn set_bytes(&mut self, bytes: Vec<u8>) {
         self.state.replace_bytes(bytes);
         if !self.config.show_ascii && self.state.active_pane() == ActivePane::Ascii {
@@ -76,32 +82,39 @@ impl HexEditor {
         }
     }
 
+    /// Return whether the current buffer differs from the saved baseline.
     pub fn is_dirty(&self) -> bool {
         self.state.is_dirty()
     }
 
+    /// Return the buffer length in bytes.
     pub fn len(&self) -> usize {
         self.state.len()
     }
 
+    /// Return the current cursor offset.
     pub fn cursor_offset(&self) -> usize {
         self.state.cursor_offset()
     }
 
+    /// Overwrite the byte at the current cursor position.
     pub fn overwrite_byte(&mut self, value: u8) {
         let _ = self.state.overwrite_byte(value);
     }
 
+    /// Apply an ASCII character at the current cursor position when ASCII is enabled.
     pub fn apply_ascii_char(&mut self, character: char) {
         if self.config.show_ascii {
             let _ = self.state.apply_ascii_char(character);
         }
     }
 
+    /// Move the cursor one byte to the left.
     pub fn move_left(&mut self) {
         self.state.move_left();
     }
 
+    /// Move the cursor one byte to the right.
     pub fn move_right(&mut self) {
         self.state.move_right();
     }

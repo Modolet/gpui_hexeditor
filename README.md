@@ -1,53 +1,74 @@
 # gpui_hexeditor
 
-一个基于 `gpui` 和 `gpui_component` 的可复用 HexEditor 组件库。
+A reusable hex editor widget built with `gpui` and `gpui_component`.
 
-## 当前特性
+## Features
 
-- 现代简洁风布局
-- 兼容 `gpui_component` theme 的语义配色
-- 地址栏、Hex 区、ASCII 区、状态栏
-- 内容区组件内部滚动，工具栏和状态栏固定
-- 光标、选区、Hex/ASCII 编辑的状态模型
-- 示例应用：`cargo run --example basic`
-- 本地文件编辑示例：`cargo run --example file_editor -- /path/to/file.bin`
+- Hex grid with optional ASCII pane
+- Selection, drag selection, row selection
+- Hex editing and ASCII editing
+- Undo / redo
+- Dirty byte tracking
+- Internal scrolling with virtual rows
+- Theme-aware styling via `gpui_component`
+- Can either use fixed visible rows or fill the parent container height
 
-## 使用方式
+## Installation
+
+```toml
+[dependencies]
+gpui_hexeditor = "0.1.0"
+```
+
+## Quick Start
 
 ```rust
-use gpui::{Context, Window};
+use gpui::Context;
 use gpui_hexeditor::{HexEditor, HexEditorConfig};
 
-fn build_editor(window: &mut Window, cx: &mut Context<MyView>) {
+fn build_editor(cx: &mut Context<MyView>) {
     let _editor = cx.new(|cx| {
-        HexEditor::new(
-            vec![0x48, 0x65, 0x78, 0x21],
-            HexEditorConfig::default().with_bytes_per_row(16),
-            cx,
-        )
+        let mut config = HexEditorConfig::default().with_bytes_per_row(16);
+        config.show_ascii = false;
+        HexEditor::new(vec![0x48, 0x65, 0x78, 0x21], config, cx)
+            .with_title("Hex Editor")
     });
 }
 ```
 
-## 示例
+## Configuration
 
-- 纯展示：`cargo run --example basic`
-- 打开并保存本地文件：`cargo run --example file_editor -- ./sample.bin`
-- 综合能力展厅：`cargo run --example showcase`
+`HexEditorConfig` supports:
 
-## 当前交互
+- `bytes_per_row`
+- `show_ascii`
+- `show_toolbar`
+- `show_status_bar`
+- `read_only`
+- `visible_rows`
+- `fill_container`
 
-- 点击 Hex/ASCII 单元格后获得焦点
-- 鼠标拖拽可连续建立选区
-- `Shift + 方向键/Home/End/PageUp/PageDown` 可扩展选区
-- `Ctrl/Cmd + C` 复制选中字节的十六进制文本
-- `Ctrl/Cmd + X` 剪切选区为十六进制文本并清零原字节
-- `Ctrl/Cmd + A` 全选全部字节
-- `Ctrl/Cmd + Z` / `Ctrl/Cmd + Shift + Z` 撤销与重做
-- 双击 Hex/ASCII 单元格可选中整行
-- 内容区支持组件内部纵向滚动
-- 方向键、`Home`、`End`、`PageUp`、`PageDown` 移动光标
-- Hex 区直接输入 `0-9A-F`，按半字节连续写入
-- ASCII 区直接输入可见字符覆盖字节
-- `Backspace` / `Delete` 直接清零当前字节
-- 未保存的脏字节会以 danger 语义色高亮，保存后清空
+Use `fill_container = true` when embedding the editor inside a panel that already controls height.
+
+## Examples
+
+```bash
+cargo run --example basic
+cargo run --example file_editor -- ./sample.bin
+cargo run --example showcase
+```
+
+## Keyboard Shortcuts
+
+- `Ctrl/Cmd + C`: copy selected bytes as hex text
+- `Ctrl/Cmd + X`: cut selected bytes as hex text
+- `Ctrl/Cmd + V`: paste hex text
+- `Ctrl/Cmd + A`: select all
+- `Ctrl/Cmd + Z`: undo
+- `Ctrl/Cmd + Shift + Z`: redo
+- `Home` / `End` / `PageUp` / `PageDown`: navigation
+- `Backspace` / `Delete`: clear current byte
+
+## License
+
+MIT

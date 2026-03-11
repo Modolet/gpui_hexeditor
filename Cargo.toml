@@ -2,6 +2,21 @@
 name = "gpui_hexeditor"
 version = "0.1.0"
 edition = "2024"
+description = "A reusable hex editor widget for GPUI applications"
+license = "MIT"
+repository = "https://github.com/Modolet/gpui_hexeditor"
+homepage = "https://github.com/Modolet/gpui_hexeditor"
+documentation = "https://docs.rs/gpui_hexeditor"
+readme = "README.md"
+keywords = ["gpui", "hex", "editor", "gui"]
+categories = ["gui"]
+include = [
+    "Cargo.toml",
+    "README.md",
+    "LICENSE",
+    "src/**",
+    "examples/**",
+]
 
 [dependencies]
 gpui = "0.2.2"
@@ -9,3 +24,6 @@ gpui-component = "0.5.1"
 
 [dev-dependencies]
 pretty_assertions = "1.4.1"
+
+[package.metadata.docs.rs]
+all-features = true
