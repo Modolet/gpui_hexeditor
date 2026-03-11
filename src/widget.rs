@@ -597,7 +597,7 @@ impl HexEditor {
                 col + 1
             ))
             .child(format!(
-                "{} · 选中 {} B · {}",
+                "{} · Selected {} B · {}",
                 self.state
                     .selected_range_label()
                     .unwrap_or_else(|| "No Selection".to_string()),
@@ -630,7 +630,7 @@ impl Render for HexEditor {
         let visible_rows = self.config.visible_rows.min(row_count.max(1));
         let content_height = style.row_height * visible_rows as f32 + style.section_gap * 2.0;
 
-        let root = div()
+        let mut root = div()
             .id("hex-editor")
             .track_focus(&self.focus_handle)
             .on_key_down(cx.listener(Self::on_key_down))
@@ -641,6 +641,9 @@ impl Render for HexEditor {
             .border_1()
             .rounded(style.radius)
             .overflow_hidden();
+        if self.config.fill_container {
+            root = root.h_full().min_h_0();
+        }
 
         let mut root = root.border_color(if is_focused {
             style.focus_ring
