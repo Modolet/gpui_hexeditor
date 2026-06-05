@@ -19,10 +19,11 @@ include = [
 ]
 
 [dependencies]
-gpui = "0.2.2"
-gpui-component = "0.5.1"
+gpui = { git = "https://github.com/zed-industries/zed.git" }
+gpui-component = { git = "https://github.com/longbridge/gpui-component.git" }
 
 [dev-dependencies]
+gpui_platform = { git = "https://github.com/zed-industries/zed.git", features = ["font-kit"] }
 pretty_assertions = "1.4.1"
 
 [package.metadata.docs.rs]

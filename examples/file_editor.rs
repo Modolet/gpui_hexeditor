@@ -1,8 +1,8 @@
 use std::{env, fs, path::PathBuf};
 
 use gpui::{
-    App, Application, Bounds, Context, Render, SharedString, Window, WindowBounds, WindowOptions,
-    div, prelude::*, px, size,
+    App, Bounds, Context, Render, SharedString, Window, WindowBounds, WindowOptions, div,
+    prelude::*, px, size,
 };
 use gpui_component::{
     ActiveTheme,
@@ -169,7 +169,7 @@ fn main() {
         .expect("usage: cargo run --example file_editor -- <path>");
     let bytes = fs::read(&path).expect("failed to read file");
 
-    Application::new().run(move |cx: &mut App| {
+    gpui_platform::application().run(move |cx: &mut App| {
         gpui_component::init(cx);
 
         let bounds = Bounds::centered(None, size(px(1240.), px(860.)), cx);

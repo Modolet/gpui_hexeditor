@@ -1,6 +1,5 @@
 use gpui::{
-    App, Application, Bounds, Context, Render, Window, WindowBounds, WindowOptions, div,
-    prelude::*, px, size,
+    App, Bounds, Context, Render, Window, WindowBounds, WindowOptions, div, prelude::*, px, size,
 };
 use gpui_component::ActiveTheme;
 use gpui_hexeditor::{HexEditor, HexEditorConfig, HexEditorEntity};
@@ -38,7 +37,7 @@ impl Render for Demo {
 }
 
 fn main() {
-    Application::new().run(|cx: &mut App| {
+    gpui_platform::application().run(|cx: &mut App| {
         gpui_component::init(cx);
 
         let bounds = Bounds::centered(None, size(px(1200.), px(760.)), cx);

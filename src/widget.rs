@@ -143,7 +143,7 @@ impl HexEditor {
             self.state.begin_selection(offset);
         }
         self.dragging_selection = true;
-        window.focus(&self.focus_handle);
+        window.focus(&self.focus_handle, cx);
         cx.notify();
     }
 
@@ -169,7 +169,7 @@ impl HexEditor {
         self.state.begin_selection(anchor);
         self.state.update_selection(offset);
         self.dragging_selection = false;
-        window.focus(&self.focus_handle);
+        window.focus(&self.focus_handle, cx);
         cx.notify();
     }
 
@@ -416,7 +416,7 @@ impl HexEditor {
                         let row = this.state.offset_to_row_col(offset).0;
                         this.state.set_active_pane(ActivePane::Hex);
                         this.state.select_row(row);
-                        window.focus(&this.focus_handle);
+                        window.focus(&this.focus_handle, cx);
                         cx.notify();
                         return;
                     }
@@ -483,7 +483,7 @@ impl HexEditor {
                         let row = this.state.offset_to_row_col(offset).0;
                         this.state.set_active_pane(ActivePane::Ascii);
                         this.state.select_row(row);
-                        window.focus(&this.focus_handle);
+                        window.focus(&this.focus_handle, cx);
                         cx.notify();
                         return;
                     }

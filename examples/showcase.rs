@@ -1,6 +1,6 @@
 use gpui::{
-    App, Application, Bounds, Context, Entity, Render, StatefulInteractiveElement, Window,
-    WindowBounds, WindowOptions, div, prelude::*, px, size,
+    App, Bounds, Context, Entity, Render, StatefulInteractiveElement, Window, WindowBounds,
+    WindowOptions, div, prelude::*, px, size,
 };
 use gpui_component::{
     ActiveTheme,
@@ -414,7 +414,7 @@ impl Render for Showcase {
 }
 
 fn main() {
-    Application::new().run(|cx: &mut App| {
+    gpui_platform::application().run(|cx: &mut App| {
         gpui_component::init(cx);
 
         let bounds = Bounds::centered(None, size(px(1520.), px(1080.)), cx);
