@@ -1,6 +1,6 @@
 # gpui_hexeditor
 
-A reusable hex editor widget built with `gpui` and `gpui_component`.
+A reusable hex editor widget built with `gpui` and `gpui_kit::component`.
 
 ## Features
 
@@ -10,20 +10,21 @@ A reusable hex editor widget built with `gpui` and `gpui_component`.
 - Undo / redo
 - Dirty byte tracking
 - Internal scrolling with virtual rows
-- Theme-aware styling via `gpui_component`
+- Theme-aware styling via `gpui_kit::component`
 - Can either use fixed visible rows or fill the parent container height
 
 ## Installation
 
 ```toml
 [dependencies]
-gpui_hexeditor = "0.1.0"
+gpui-kit = "0.6.0"
+gpui_hexeditor = "0.2.0"
 ```
 
 ## Quick Start
 
 ```rust
-use gpui::Context;
+use gpui_kit::Context;
 use gpui_hexeditor::{HexEditor, HexEditorConfig};
 
 fn build_editor(cx: &mut Context<MyView>) {

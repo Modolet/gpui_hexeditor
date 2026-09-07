@@ -1,6 +1,6 @@
 [package]
 name = "gpui_hexeditor"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 description = "A reusable hex editor widget for GPUI applications"
 license = "MIT"
@@ -19,12 +19,12 @@ include = [
 ]
 
 [dependencies]
-gpui = { git = "https://github.com/zed-industries/zed.git" }
-gpui-component = { git = "https://github.com/longbridge/gpui-component.git" }
+gpui-kit = { version = "0.6.0", default-features = false, features = ["component"] }
 
 [dev-dependencies]
-gpui_platform = { git = "https://github.com/zed-industries/zed.git", features = ["font-kit"] }
 pretty_assertions = "1.4.1"
 
 [package.metadata.docs.rs]
 all-features = true
+
+[workspace]

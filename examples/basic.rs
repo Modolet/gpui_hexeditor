@@ -1,8 +1,8 @@
-use gpui::{
+use gpui_hexeditor::{HexEditor, HexEditorConfig, HexEditorEntity};
+use gpui_kit::component::ActiveTheme;
+use gpui_kit::{
     App, Bounds, Context, Render, Window, WindowBounds, WindowOptions, div, prelude::*, px, size,
 };
-use gpui_component::ActiveTheme;
-use gpui_hexeditor::{HexEditor, HexEditorConfig, HexEditorEntity};
 
 struct Demo {
     editor: HexEditorEntity,
@@ -37,8 +37,8 @@ impl Render for Demo {
 }
 
 fn main() {
-    gpui_platform::application().run(|cx: &mut App| {
-        gpui_component::init(cx);
+    gpui_kit::platform::application().run(|cx: &mut App| {
+        gpui_kit::component::init(cx);
 
         let bounds = Bounds::centered(None, size(px(1200.), px(760.)), cx);
         cx.open_window(

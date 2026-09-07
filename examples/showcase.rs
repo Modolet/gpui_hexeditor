@@ -1,13 +1,13 @@
-use gpui::{
-    App, Bounds, Context, Entity, Render, StatefulInteractiveElement, Window, WindowBounds,
-    WindowOptions, div, prelude::*, px, size,
-};
-use gpui_component::{
+use gpui_hexeditor::{HexEditor, HexEditorConfig, HexEditorEntity, HexEditorStyle};
+use gpui_kit::component::{
     ActiveTheme,
     button::{Button, ButtonVariants},
     label::Label,
 };
-use gpui_hexeditor::{HexEditor, HexEditorConfig, HexEditorEntity, HexEditorStyle};
+use gpui_kit::{
+    App, Bounds, Context, Entity, Render, StatefulInteractiveElement, Window, WindowBounds,
+    WindowOptions, div, prelude::*, px, size,
+};
 
 struct Showcase {
     main_editor: HexEditorEntity,
@@ -131,7 +131,7 @@ impl Showcase {
         id: &'static str,
         label: &'static str,
         active: bool,
-        on_click: impl Fn(&mut Showcase, &gpui::ClickEvent, &mut Window, &mut Context<Showcase>)
+        on_click: impl Fn(&mut Showcase, &gpui_kit::ClickEvent, &mut Window, &mut Context<Showcase>)
         + 'static,
         cx: &mut Context<Self>,
     ) -> Button {
@@ -414,8 +414,8 @@ impl Render for Showcase {
 }
 
 fn main() {
-    gpui_platform::application().run(|cx: &mut App| {
-        gpui_component::init(cx);
+    gpui_kit::platform::application().run(|cx: &mut App| {
+        gpui_kit::component::init(cx);
 
         let bounds = Bounds::centered(None, size(px(1520.), px(1080.)), cx);
         cx.open_window(

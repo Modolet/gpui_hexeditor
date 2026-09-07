@@ -1,15 +1,15 @@
 use std::{env, fs, path::PathBuf};
 
-use gpui::{
-    App, Bounds, Context, Render, SharedString, Window, WindowBounds, WindowOptions, div,
-    prelude::*, px, size,
-};
-use gpui_component::{
+use gpui_hexeditor::{HexEditor, HexEditorConfig, HexEditorEntity};
+use gpui_kit::component::{
     ActiveTheme,
     button::{Button, ButtonVariants},
     label::Label,
 };
-use gpui_hexeditor::{HexEditor, HexEditorConfig, HexEditorEntity};
+use gpui_kit::{
+    App, Bounds, Context, Render, SharedString, Window, WindowBounds, WindowOptions, div,
+    prelude::*, px, size,
+};
 
 struct FileEditorDemo {
     path: PathBuf,
@@ -169,8 +169,8 @@ fn main() {
         .expect("usage: cargo run --example file_editor -- <path>");
     let bytes = fs::read(&path).expect("failed to read file");
 
-    gpui_platform::application().run(move |cx: &mut App| {
-        gpui_component::init(cx);
+    gpui_kit::platform::application().run(move |cx: &mut App| {
+        gpui_kit::component::init(cx);
 
         let bounds = Bounds::centered(None, size(px(1240.), px(860.)), cx);
         let path = path.clone();

@@ -1,9 +1,9 @@
-use gpui::{
+use gpui_kit::component::{ActiveTheme, label::Label, v_virtual_list};
+use gpui_kit::{
     App, ClipboardItem, Context, Entity, FocusHandle, Focusable, InteractiveElement, IntoElement,
     KeyDownEvent, MouseButton, MouseMoveEvent, MouseUpEvent, ParentElement, Render, SharedString,
     Styled, Window, div, prelude::FluentBuilder, px,
 };
-use gpui_component::{ActiveTheme, label::Label, v_virtual_list};
 use std::rc::Rc;
 
 use crate::{HexEditorConfig, HexEditorState, HexEditorStyle, state::ActivePane};
@@ -90,6 +90,11 @@ impl HexEditor {
     /// Return the buffer length in bytes.
     pub fn len(&self) -> usize {
         self.state.len()
+    }
+
+    /// Returns whether the editor contains no bytes.
+    pub fn is_empty(&self) -> bool {
+        self.state.is_empty()
     }
 
     /// Return the current cursor offset.
@@ -242,12 +247,11 @@ impl HexEditor {
         if (modifiers.control || modifiers.platform)
             && event.keystroke.key.eq_ignore_ascii_case("v")
         {
-            if let Some(item) = cx.read_from_clipboard() {
-                if let Some(text) = item.text() {
-                    if self.state.paste_hex_string(&text).is_ok() {
-                        cx.notify();
-                    }
-                }
+            if let Some(item) = cx.read_from_clipboard()
+                && let Some(text) = item.text()
+                && self.state.paste_hex_string(&text).is_ok()
+            {
+                cx.notify();
             }
             return;
         }
@@ -411,7 +415,7 @@ impl HexEditor {
             .cursor_pointer()
             .on_mouse_down(
                 MouseButton::Left,
-                cx.listener(move |this, event: &gpui::MouseDownEvent, window, cx| {
+                cx.listener(move |this, event: &gpui_kit::MouseDownEvent, window, cx| {
                     if event.click_count >= 2 {
                         let row = this.state.offset_to_row_col(offset).0;
                         this.state.set_active_pane(ActivePane::Hex);
@@ -478,7 +482,7 @@ impl HexEditor {
             .cursor_pointer()
             .on_mouse_down(
                 MouseButton::Left,
-                cx.listener(move |this, event: &gpui::MouseDownEvent, window, cx| {
+                cx.listener(move |this, event: &gpui_kit::MouseDownEvent, window, cx| {
                     if event.click_count >= 2 {
                         let row = this.state.offset_to_row_col(offset).0;
                         this.state.set_active_pane(ActivePane::Ascii);
@@ -637,7 +641,7 @@ impl Render for HexEditor {
         let row_count = self.state.row_count();
         let row_sizes = Rc::new(
             (0..row_count)
-                .map(|_| gpui::size(px(0.), style.row_height))
+                .map(|_| gpui_kit::size(px(0.), style.row_height))
                 .collect::<Vec<_>>(),
         );
         let visible_rows = self.config.visible_rows.min(row_count.max(1));

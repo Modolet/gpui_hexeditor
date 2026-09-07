@@ -1,5 +1,5 @@
-use gpui::{App, Hsla, Pixels, px};
-use gpui_component::{ActiveTheme, Theme};
+use gpui_kit::component::{ActiveTheme, Theme};
+use gpui_kit::{App, Hsla, Pixels, px};
 
 /// `HexEditor` 使用的主题派生样式。
 #[derive(Debug, Clone, Copy, PartialEq)]
