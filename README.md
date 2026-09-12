@@ -9,7 +9,8 @@ A reusable hex editor widget built with `gpui` and `gpui_kit::component`.
 - Hex editing and ASCII editing
 - Undo / redo
 - Dirty byte tracking
-- Internal scrolling with virtual rows
+- Internal scrolling with virtual rows and retained scroll position
+- Batched HEX / ASCII row drawing with shared pointer geometry
 - Theme-aware styling via `gpui_kit::component`
 - Can either use fixed visible rows or fill the parent container height
 
@@ -18,7 +19,7 @@ A reusable hex editor widget built with `gpui` and `gpui_kit::component`.
 ```toml
 [dependencies]
 gpui-kit = "0.6.0"
-gpui_hexeditor = "0.2.0"
+gpui_hexeditor = "0.2.1"
 ```
 
 ## Quick Start
