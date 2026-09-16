@@ -218,6 +218,7 @@ impl HexEditor {
         &self,
         row: usize,
         style: HexEditorStyle,
+        window: &Window,
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
         let row_start = row * self.state.bytes_per_row();
@@ -243,6 +244,7 @@ impl HexEditor {
             .child(
                 div()
                     .flex_1()
+                    .max_w(self.hex_pane_width(window))
                     .min_w_0()
                     .h_full()
                     .child(self.render_byte_pane(row, ActivePane::Hex, style, cx)),

@@ -357,7 +357,12 @@ impl HexEditor {
             )
     }
 
-    fn render_header(&self, style: HexEditorStyle) -> impl IntoElement {
+    fn hex_pane_width(&self, window: &Window) -> gpui_kit::Pixels {
+        let columns = self.state.bytes_per_row();
+        px(36.) * columns as f32 + window.rem_size() * 0.125 * columns.saturating_sub(1) as f32
+    }
+
+    fn render_header(&self, style: HexEditorStyle, window: &Window) -> impl IntoElement {
         div()
             .flex()
             .flex_row()
@@ -376,20 +381,29 @@ impl HexEditor {
                     .text_color(style.muted_text)
                     .child("Offset"),
             )
-            .child(div().min_w_0().flex_1().flex().gap_0p5().children(
-                (0..self.state.bytes_per_row()).map(|index| {
-                    div()
-                        .w(px(36.))
-                        .text_center()
-                        .text_xs()
-                        .text_color(style.muted_text)
-                        .child(format!("{index:02X}"))
-                }),
-            ))
+            .child(
+                div()
+                    .debug_selector(|| "hex-header".into())
+                    .min_w_0()
+                    .flex_1()
+                    .max_w(self.hex_pane_width(window))
+                    .flex()
+                    .gap_0p5()
+                    .children((0..self.state.bytes_per_row()).map(|index| {
+                        div()
+                            .w(px(36.))
+                            .min_w_0()
+                            .text_center()
+                            .text_xs()
+                            .text_color(style.muted_text)
+                            .child(format!("{index:02X}"))
+                    })),
+            )
             .when(self.config.show_ascii, |this| {
                 this.child(
                     div()
                         .w(px(144.))
+                        .debug_selector(|| "ascii-header".into())
                         .flex_shrink_0()
                         .text_xs()
                         .text_color(style.muted_text)
@@ -476,23 +490,23 @@ impl Render for HexEditor {
         if self.config.show_toolbar {
             root = root.child(self.render_toolbar(style));
         }
-        root = root.child(self.render_header(style));
+        root = root.child(self.render_header(style, window));
         let mut scroll = div()
             .id("hex-editor-scroll")
             .overflow_hidden()
             .flex()
             .flex_col()
             .gap_0p5()
-            .p_0p5()
+            .py_0p5()
             .bg(cx.theme().background)
             .child(
                 v_virtual_list(
                     cx.entity(),
                     "hex-editor-rows",
                     row_sizes,
-                    move |editor, visible_range, _window, cx| {
+                    move |editor, visible_range, window, cx| {
                         visible_range
-                            .map(|row| editor.render_row(row, style, cx).into_any_element())
+                            .map(|row| editor.render_row(row, style, window, cx).into_any_element())
                             .collect::<Vec<_>>()
                     },
                 )

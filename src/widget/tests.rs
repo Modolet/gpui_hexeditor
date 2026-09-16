@@ -14,7 +14,7 @@ fn batched_memory_rows_preserve_pointer_editing_after_scroll_and_resize(cx: &mut
     // A single editor gives stable debug selectors without the two page axes.
     cx.update(gpui_kit::component::init);
     let mut editor = None;
-    let window = cx.open_window(size(px(800.), px(260.)), |window, cx| {
+    let window = cx.open_window(size(px(1600.), px(260.)), |window, cx| {
         let view = cx.new(|cx| {
             HexEditor::new(
                 vec![0; 515],
@@ -48,6 +48,21 @@ fn batched_memory_rows_preserve_pointer_editing_after_scroll_and_resize(cx: &mut
     repaint(&mut v);
     let hex0 = v.debug_bounds("hex-row-0").unwrap();
     let hex1 = v.debug_bounds("hex-row-1").unwrap();
+    let ascii0 = v.debug_bounds("ascii-row-0").unwrap();
+    assert_eq!(hex0.size.width, px(606.));
+    assert_eq!(ascii0.origin.x - hex0.right(), px(6.));
+    assert_eq!(
+        v.debug_bounds("hex-header").unwrap().origin.x,
+        hex0.origin.x
+    );
+    assert_eq!(
+        v.debug_bounds("hex-header").unwrap().size.width,
+        hex0.size.width
+    );
+    assert_eq!(
+        v.debug_bounds("ascii-header").unwrap().origin.x,
+        ascii0.origin.x
+    );
     assert_eq!(hex0.size.height, px(19.));
     assert_eq!(hex1.origin.y - hex0.origin.y, px(19.));
     v.simulate_click(cell(hex0, 3, 16, 36.), Modifiers::none());
@@ -141,6 +156,21 @@ fn batched_memory_rows_preserve_pointer_editing_after_scroll_and_resize(cx: &mut
     });
     repaint(&mut v);
     let last = v.debug_bounds("hex-row-32").unwrap();
+    let ascii_last = v.debug_bounds("ascii-row-32").unwrap();
+    assert!(last.size.width < px(606.));
+    assert_eq!(ascii_last.origin.x - last.right(), px(6.));
+    assert_eq!(
+        v.debug_bounds("hex-header").unwrap().origin.x,
+        last.origin.x
+    );
+    assert_eq!(
+        v.debug_bounds("hex-header").unwrap().size.width,
+        last.size.width
+    );
+    assert_eq!(
+        v.debug_bounds("ascii-header").unwrap().origin.x,
+        ascii_last.origin.x
+    );
     // Clicking a blank HEX slot in the short final row still clamps to the final byte.
     v.simulate_click(cell(last, 15, 16, 36.), Modifiers::none());
     assert_eq!(

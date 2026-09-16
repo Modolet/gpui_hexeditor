@@ -1,6 +1,6 @@
 [package]
 name = "gpui_hexeditor"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2024"
 description = "A reusable hex editor widget for GPUI applications"
 license = "MIT"
