@@ -18,8 +18,8 @@ A reusable hex editor widget built with `gpui` and `gpui_kit::component`.
 
 ```toml
 [dependencies]
-gpui-kit = "0.6.0"
-gpui_hexeditor = "0.2.2"
+gpui-kit = "0.9.0"
+gpui_hexeditor = "0.3.0"
 ```
 
 ## Quick Start

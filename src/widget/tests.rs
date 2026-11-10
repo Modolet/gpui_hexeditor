@@ -149,7 +149,7 @@ fn batched_memory_rows_preserve_pointer_editing_after_scroll_and_resize(cx: &mut
         gpui_kit::component::Theme::change(gpui_kit::component::ThemeMode::Light, Some(window), cx)
     });
     repaint(&mut v);
-    v.simulate_event(gpui_kit::ScrollWheelEvent {
+    v.simulate_event(gpui_kit::ScrollEvent {
         position: point(px(300.), px(120.)),
         delta: gpui_kit::ScrollDelta::Pixels(point(px(0.), px(-10_000.))),
         ..Default::default()

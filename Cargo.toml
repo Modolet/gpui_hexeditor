@@ -1,6 +1,6 @@
 [package]
 name = "gpui_hexeditor"
-version = "0.2.2"
+version = "0.3.0"
 edition = "2024"
 description = "A reusable hex editor widget for GPUI applications"
 license = "MIT"
@@ -19,10 +19,10 @@ include = [
 ]
 
 [dependencies]
-gpui-kit = { version = "0.6.0", default-features = false, features = ["component"] }
+gpui-kit = { version = "0.9.0", default-features = false, features = ["component"] }
 
 [dev-dependencies]
-gpui-kit = { version = "0.6.0", default-features = false, features = ["component", "test-support"] }
+gpui-kit = { version = "0.9.0", default-features = false, features = ["component", "test-support"] }
 pretty_assertions = "1.4.1"
 
 [package.metadata.docs.rs]
