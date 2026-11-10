@@ -11,11 +11,11 @@ readme = "README.md"
 keywords = ["gpui", "hex", "editor", "gui"]
 categories = ["gui"]
 include = [
-    "Cargo.toml",
-    "README.md",
-    "LICENSE",
-    "src/**",
-    "examples/**",
+    "/Cargo.toml",
+    "/README.md",
+    "/LICENSE",
+    "/src/**",
+    "/examples/**",
 ]
 
 [dependencies]
